@@ -7,8 +7,8 @@ const PAGE_SIZE = 8;
 const MENU_RADIUS = 230;
 const PIE_CENTER = 230;
 const PIE_OUTER_RADIUS = 218;
-const PIE_INNER_RADIUS = 94;
-const PIE_GAP_RADIANS = 0.035;
+const PIE_INNER_RADIUS = 69;
+const PIE_GAP_RADIANS = 0;
 
 interface OverlayPosition {
   x: number;
@@ -56,6 +56,7 @@ function Overlay() {
   const positionRef = useRef<OverlayPosition | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const playbackIdRef = useRef(0);
+  const hoveredSoundRef = useRef<SoundFile | null>(null);
 
   const pageCount = Math.max(1, Math.ceil(sounds.length / PAGE_SIZE));
   const visibleSounds = useMemo(
@@ -68,6 +69,7 @@ function Overlay() {
       setSounds((args[0] as SoundFile[]) ?? []);
       setPage(0);
       positionRef.current = null;
+      hoveredSoundRef.current = null;
       setPosition(null);
       setActive(true);
     };
@@ -75,6 +77,7 @@ function Overlay() {
     const onHide = () => {
       setActive(false);
       positionRef.current = null;
+      hoveredSoundRef.current = null;
       setPosition(null);
     };
     window.ipcRenderer?.on("overlay:hide", onHide);
@@ -90,6 +93,15 @@ function Overlay() {
       setPlaying(null);
     };
     window.ipcRenderer?.on("overlay:stop-playback", stopPlayback);
+    const confirmSelection = () => {
+      const hoveredSound = hoveredSoundRef.current;
+      if (hoveredSound) {
+        play(hoveredSound);
+      } else {
+        window.overlay?.hide();
+      }
+    };
+    window.ipcRenderer?.on("overlay:confirm-selection", confirmSelection);
 
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") window.overlay?.hide();
@@ -109,6 +121,7 @@ function Overlay() {
       window.ipcRenderer?.off("overlay:show", onShow);
       window.ipcRenderer?.off("overlay:hide", onHide);
       window.ipcRenderer?.off("overlay:stop-playback", stopPlayback);
+      window.ipcRenderer?.off("overlay:confirm-selection", confirmSelection);
       window.removeEventListener("keydown", onKeyDown);
     };
   }, []);
@@ -161,6 +174,11 @@ function Overlay() {
       .catch(finish);
   }
 
+  function changePage(offset: number): void {
+    hoveredSoundRef.current = null;
+    setPage((current) => (current + offset + pageCount) % pageCount);
+  }
+
   return (
     <main
       className={`overlay-shell${active ? " is-active" : ""}${position ? " is-positioned" : ""}`}
@@ -182,7 +200,6 @@ function Overlay() {
               role="group"
               aria-label="Áudios disponíveis"
             >
-              <circle className="overlay-pie-track" cx="230" cy="230" r="218" />
               {visibleSounds.map((sound, index) => {
                 const sliceAngle = (Math.PI * 2) / Math.max(visibleSounds.length, 1);
                 const startAngle = index * sliceAngle - Math.PI / 2 + PIE_GAP_RADIANS / 2;
@@ -201,6 +218,18 @@ function Overlay() {
                     role="button"
                     tabIndex={0}
                     aria-label={`Tocar ${labelFor(sound.name)}`}
+                    onPointerEnter={() => {
+                      hoveredSoundRef.current = sound;
+                    }}
+                    onPointerLeave={() => {
+                      if (hoveredSoundRef.current === sound) hoveredSoundRef.current = null;
+                    }}
+                    onFocus={() => {
+                      hoveredSoundRef.current = sound;
+                    }}
+                    onBlur={() => {
+                      if (hoveredSoundRef.current === sound) hoveredSoundRef.current = null;
+                    }}
                     onClick={() => play(sound)}
                     onKeyDown={(event) => {
                       if (event.key !== "Enter" && event.key !== " ") return;
@@ -210,18 +239,9 @@ function Overlay() {
                   >
                     <path className="overlay-slice-shape" d={pieSlicePath(startAngle, endAngle)} />
                     <text
-                      className="overlay-slice-icon"
-                      x={labelPoint.x}
-                      y={labelPoint.y - 8}
-                      textAnchor="middle"
-                      aria-hidden="true"
-                    >
-                      {isPlaying ? "▶" : "♪"}
-                    </text>
-                    <text
                       className="overlay-slice-label"
                       x={labelPoint.x}
-                      y={labelPoint.y + 15}
+                      y={labelPoint.y + 3}
                       textAnchor="middle"
                       aria-hidden="true"
                     >
@@ -233,43 +253,29 @@ function Overlay() {
             </svg>
 
             <div className="overlay-center">
-              <span className="overlay-kicker">SOUNDBOARD</span>
+              <span className={`overlay-kicker${playing ? " is-live" : ""}`}>
+                {playing ? "A tocar" : "Soundboard"}
+              </span>
               {sounds.length === 0 ? (
                 <strong>Sem áudios</strong>
+              ) : playing ? (
+                <strong title={labelFor(playing)}>{labelFor(playing)}</strong>
               ) : (
-                <>
-                  <strong>Escolha um som</strong>
-                  <small>Clique para tocar</small>
-                </>
+                <strong>Escolha um som</strong>
               )}
               {pageCount > 1 && (
                 <div className="overlay-pages">
-                  <button
-                    type="button"
-                    aria-label="Página anterior"
-                    onClick={() => setPage((current) => (current - 1 + pageCount) % pageCount)}
-                  >
+                  <button type="button" aria-label="Página anterior" onClick={() => changePage(-1)}>
                     ‹
                   </button>
                   <span>
                     {page + 1}/{pageCount}
                   </span>
-                  <button
-                    type="button"
-                    aria-label="Próxima página"
-                    onClick={() => setPage((current) => (current + 1) % pageCount)}
-                  >
+                  <button type="button" aria-label="Próxima página" onClick={() => changePage(1)}>
                     ›
                   </button>
                 </div>
               )}
-              <button
-                className="overlay-close"
-                type="button"
-                onClick={() => window.overlay?.hide()}
-              >
-                Esc para fechar
-              </button>
             </div>
           </section>
         </div>
