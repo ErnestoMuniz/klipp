@@ -11,9 +11,12 @@ import {
 } from "electron";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { uIOhook, UiohookKey, type UiohookKeyboardEvent } from "uiohook-napi";
 import { AudioManager, registerAudioIpc } from "./audio";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
+app.commandLine.appendSwitch("enable-features", "GlobalShortcutsPortal");
 
 process.env.APP_ROOT = path.join(__dirname, "..");
 
@@ -27,7 +30,6 @@ process.env.VITE_PUBLIC = VITE_DEV_SERVER_URL
 process.env.PULSE_SINK = "soundboard-clips";
 
 const GLOBAL_SHORTCUT = "Alt+Shift+S";
-const OVERLAY_TIMEOUT_MS = 15_000;
 
 // ============================================================================
 // ESTADO GLOBAL
@@ -38,9 +40,9 @@ const audio = new AudioManager();
 let win: BrowserWindow | null = null;
 let tray: Tray | null = null;
 let isQuitting = false;
-let shortcutRegistered = false;
-let overlayHideTimer: NodeJS.Timeout | null = null;
+let shortcutHeld = false;
 let overlayActive = false;
+let activeOverlayDisplayId: number | null = null;
 
 interface OverlayView {
   displayId: number;
@@ -108,14 +110,14 @@ function createTray() {
   tray = new Tray(icon.isEmpty() ? nativeImage.createEmpty() : icon);
 
   const menu = Menu.buildFromTemplate([
-    { label: "Soundboard", enabled: false },
+    { label: "Klipp", enabled: false },
     { type: "separator" },
     { label: "Mostrar", click: () => showWindow() },
     { label: "Sair", click: () => quitApp() },
   ]);
 
   tray.setContextMenu(menu);
-  tray.setToolTip("Soundboard — clique para abrir");
+  tray.setToolTip("Klipp — clique para abrir");
   tray.on("click", () => showWindow());
 }
 
@@ -128,16 +130,9 @@ function quitApp() {
 // OVERLAY ELECTRON
 // ============================================================================
 
-function clearOverlayTimer(): void {
-  if (overlayHideTimer) {
-    clearTimeout(overlayHideTimer);
-    overlayHideTimer = null;
-  }
-}
-
 function hideOverlays(): void {
-  clearOverlayTimer();
   overlayActive = false;
+  activeOverlayDisplayId = null;
   for (const { window } of overlays.values()) {
     if (window.isDestroyed()) continue;
 
@@ -241,12 +236,11 @@ function recreateOverlay(display: Display): void {
 function showOverlay(): void {
   syncOverlays();
 
-  if (overlayActive) {
-    hideOverlays();
-    return;
-  }
+  if (overlayActive) return;
 
   overlayActive = true;
+  const activeDisplay = screen.getDisplayNearestPoint(screen.getCursorScreenPoint());
+  activeOverlayDisplayId = activeDisplay.id;
   for (const view of overlays.values()) {
     if (view.window.isDestroyed()) continue;
     if (view.rendererReady) {
@@ -257,8 +251,22 @@ function showOverlay(): void {
     view.window.setIgnoreMouseEvents(false);
   }
 
-  clearOverlayTimer();
-  overlayHideTimer = setTimeout(hideOverlays, OVERLAY_TIMEOUT_MS);
+  overlays.get(activeDisplay.id)?.window.focus();
+}
+
+function confirmOverlaySelection(): void {
+  if (!overlayActive || activeOverlayDisplayId === null) {
+    hideOverlays();
+    return;
+  }
+
+  const activeOverlay = overlays.get(activeOverlayDisplayId);
+  if (!activeOverlay?.rendererReady || activeOverlay.window.isDestroyed()) {
+    hideOverlays();
+    return;
+  }
+
+  activeOverlay.window.webContents.send("overlay:confirm-selection");
 }
 
 function overlayForWebContents(webContentsId: number): OverlayView | undefined {
@@ -270,6 +278,7 @@ function registerOverlayIpc(): void {
     const selectedOverlay = overlayForWebContents(event.sender.id);
     if (!selectedOverlay || !overlayActive) return;
 
+    activeOverlayDisplayId = selectedOverlay.displayId;
     for (const view of overlays.values()) {
       if (view === selectedOverlay || view.window.isDestroyed()) continue;
       view.window.webContents.send("overlay:hide");
@@ -306,11 +315,48 @@ function registerOverlayIpc(): void {
 // ATALHO GLOBAL
 // ============================================================================
 
-function registerShortcut() {
-  if (shortcutRegistered) return;
-  shortcutRegistered = globalShortcut.register(GLOBAL_SHORTCUT, () => {
+function isShortcutKey(event: UiohookKeyboardEvent): boolean {
+  return event.keycode === UiohookKey.S;
+}
+
+function isShortcutModifier(event: UiohookKeyboardEvent): boolean {
+  return (
+    event.keycode === UiohookKey.Alt ||
+    event.keycode === UiohookKey.AltRight ||
+    event.keycode === UiohookKey.Shift ||
+    event.keycode === UiohookKey.ShiftRight
+  );
+}
+
+function registerShortcut(): void {
+  const registered = globalShortcut.register(GLOBAL_SHORTCUT, () => {
+    shortcutHeld = true;
     showOverlay();
   });
+
+  if (!registered) {
+    console.error(`Não foi possível registrar o atalho global ${GLOBAL_SHORTCUT}.`);
+  }
+
+  uIOhook.on("keydown", (event) => {
+    if (shortcutHeld || !isShortcutKey(event) || !event.altKey || !event.shiftKey) return;
+    shortcutHeld = true;
+    showOverlay();
+  });
+
+  uIOhook.on("keyup", (event) => {
+    if (
+      !shortcutHeld ||
+      (!isShortcutKey(event) && !isShortcutModifier(event) && event.altKey && event.shiftKey)
+    ) {
+      return;
+    }
+
+    shortcutHeld = false;
+    confirmOverlaySelection();
+  });
+
+  uIOhook.start();
 }
 
 // ============================================================================
@@ -326,6 +372,7 @@ function cleanupAndExit(exitCode = 0): void {
   if (cleaningUp) return;
   cleaningUp = true;
   globalShortcut.unregisterAll();
+  uIOhook.stop();
   hideOverlays();
   void audio.cleanup().finally(() => process.exit(exitCode));
 }

@@ -1,6 +1,7 @@
 allowBuilds:
   electron: true
   electron-winstaller: true
+  uiohook-napi: true
 catalog:
   vite: npm:@voidzero-dev/vite-plus-core@latest
   vitest: 4.1.9
