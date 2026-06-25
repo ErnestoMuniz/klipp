@@ -1,21 +1,62 @@
+/* =========================================================================
+   Klipp — design tokens
+   A "studio console" palette: warm paper / charcoal surfaces, a signal-red
+   accent (the REC light), layered depth (gradients + inset highlights + soft
+   shadows) and a faint grain. Not flashy, not flat.
+   ========================================================================= */
+
 :root {
-  --text: #6b6375;
-  --text-h: #08060d;
-  --bg: #fff;
-  --border: #e5e4e7;
-  --code-bg: #f4f3ec;
-  --accent: #6b7280;
-  --accent-bg: rgba(107, 114, 128, 0.12);
-  --accent-border: rgba(107, 114, 128, 0.5);
-  --social-bg: rgba(244, 243, 236, 0.5);
-  --shadow: rgba(0, 0, 0, 0.1) 0 10px 15px -3px, rgba(0, 0, 0, 0.05) 0 4px 6px -2px;
+  /* ink & text */
+  --text: #5b554b;
+  --text-h: #18130d;
+  --text-faint: #8a8377;
 
-  --sans: system-ui, "Segoe UI", Roboto, sans-serif;
-  --heading: system-ui, "Segoe UI", Roboto, sans-serif;
-  --mono: ui-monospace, Consolas, monospace;
+  /* surfaces */
+  --bg: #f3efe6; /* warm paper */
+  --bg-2: #ece7da; /* recessed paper */
+  --surface: #fbf9f3; /* raised card */
+  --surface-raise: #ffffff; /* top of gradient */
+  --surface-sunk: #ede8db; /* input / well */
+  --border: #ddd6c6;
+  --border-strong: #c9c1ae;
+  --hairline: rgba(24, 19, 13, 0.06);
 
-  font: 18px/145% var(--sans);
-  letter-spacing: 0.18px;
+  /* code / chips */
+  --code-bg: #e7e1d2;
+
+  /* signal accent (the REC light) */
+  --accent: #e2482a;
+  --accent-deep: #b8351b;
+  --accent-ink: #fff7f2;
+  --accent-bg: rgba(226, 72, 42, 0.1);
+  --accent-bg-strong: rgba(226, 72, 42, 0.18);
+  --accent-border: rgba(226, 72, 42, 0.42);
+  --accent-glow: rgba(226, 72, 42, 0.35);
+
+  /* secondary — deep ink used for "pressed" / contrast tiles */
+  --ink: #1c1710;
+  --ink-soft: #2a241b;
+  --ink-line: rgba(255, 255, 255, 0.08);
+
+  --good: #2f8f5b;
+
+  --shadow-sm: 0 1px 2px rgba(40, 30, 15, 0.06), 0 1px 1px rgba(40, 30, 15, 0.04);
+  --shadow: 0 2px 4px rgba(40, 30, 15, 0.05), 0 8px 20px -10px rgba(40, 30, 15, 0.18);
+  --shadow-lg: 0 4px 8px rgba(40, 30, 15, 0.06), 0 24px 48px -20px rgba(40, 30, 15, 0.28);
+  --inset-hi: inset 0 1px 0 rgba(255, 255, 255, 0.65);
+  --inset-lo: inset 0 1px 2px rgba(40, 30, 15, 0.1);
+
+  /* fonts */
+  --sans: "Inter", system-ui, "Segoe UI", Roboto, sans-serif;
+  --display: var(--sans);
+  --mono: "JetBrains Mono", ui-monospace, "SF Mono", Consolas, monospace;
+
+  --radius: 10px;
+  --radius-sm: 7px;
+  --radius-lg: 16px;
+
+  font: 17px/1.45 var(--sans);
+  letter-spacing: -0.005em;
   color-scheme: light dark;
   color: var(--text);
   background: var(--bg);
@@ -31,16 +72,40 @@
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --text: #9ca3af;
-    --text-h: #f3f4f6;
-    --bg: #16171d;
-    --border: #2e303a;
-    --code-bg: #1f2028;
-    --accent: #9ca3af;
-    --accent-bg: rgba(156, 163, 175, 0.15);
-    --accent-border: rgba(156, 163, 175, 0.5);
-    --social-bg: rgba(47, 48, 58, 0.5);
-    --shadow: rgba(0, 0, 0, 0.4) 0 10px 15px -3px, rgba(0, 0, 0, 0.25) 0 4px 6px -2px;
+    --text: #9b948a;
+    --text-h: #f1ede4;
+    --text-faint: #6f695f;
+
+    --bg: #0e0e0e; /* warm charcoal */
+    --bg-2: #161616;
+    --surface: #1a1a1a;
+    --surface-raise: #1e1e1e;
+    --surface-sunk: #141414;
+    --border: #2b2b2b;
+    --border-strong: #383838;
+    --hairline: rgba(255, 255, 255, 0.06);
+
+    --code-bg: #1f1c16;
+
+    --accent: #42a1ff;
+    --accent-deep: #2a80e2;
+    --accent-ink: #06121a;
+    --accent-bg: rgba(66, 189, 255, 0.13);
+    --accent-bg-strong: rgba(66, 183, 255, 0.22);
+    --accent-border: rgba(66, 192, 255, 0.5);
+    --accent-glow: rgba(66, 183, 255, 0.4);
+
+    --ink: #f1ede4;
+    --ink-soft: #d9d3c6;
+    --ink-line: rgba(0, 0, 0, 0.4);
+
+    --good: #4caa72;
+
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4), 0 1px 1px rgba(0, 0, 0, 0.3);
+    --shadow: 0 2px 4px rgba(0, 0, 0, 0.4), 0 10px 24px -12px rgba(0, 0, 0, 0.6);
+    --shadow-lg: 0 4px 10px rgba(0, 0, 0, 0.45), 0 28px 56px -24px rgba(0, 0, 0, 0.7);
+    --inset-hi: inset 0 1px 0 rgba(255, 248, 235, 0.06);
+    --inset-lo: inset 0 1px 2px rgba(0, 0, 0, 0.5);
   }
 
   #social .button-icon {
@@ -48,16 +113,38 @@
   }
 }
 
+/* ===== App frame ===== */
 #root {
   width: 1126px;
   max-width: 100%;
   margin: 0 auto;
   text-align: center;
-  border-inline: 1px solid var(--border);
   min-height: 100svh;
   display: flex;
   flex-direction: column;
   box-sizing: border-box;
+  position: relative;
+  background: radial-gradient(120% 60% at 50% -10%, var(--bg-2), transparent 70%), var(--bg);
+  border-inline: 1px solid var(--hairline);
+}
+
+/* faint film grain — adds texture so surfaces don't read as flat plastic */
+#root::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0.5;
+  mix-blend-mode: multiply;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.035'/%3E%3C/svg%3E");
+}
+
+@media (prefers-color-scheme: dark) {
+  #root::before {
+    mix-blend-mode: screen;
+    opacity: 0.35;
+  }
 }
 
 body {
@@ -66,14 +153,15 @@ body {
 
 h1,
 h2 {
-  font-family: var(--heading);
-  font-weight: 500;
+  font-family: var(--display);
+  font-weight: 600;
   color: var(--text-h);
+  letter-spacing: -0.02em;
 }
 
 h1 {
   font-size: 56px;
-  letter-spacing: -1.68px;
+  letter-spacing: -0.04em;
   margin: 32px 0;
   @media (max-width: 1024px) {
     font-size: 36px;
@@ -82,8 +170,7 @@ h1 {
 }
 h2 {
   font-size: 24px;
-  line-height: 118%;
-  letter-spacing: -0.24px;
+  line-height: 1.18;
   margin: 0 0 8px;
   @media (max-width: 1024px) {
     font-size: 20px;
@@ -97,13 +184,16 @@ code,
 .counter {
   font-family: var(--mono);
   display: inline-flex;
-  border-radius: 4px;
+  align-items: center;
+  border-radius: 5px;
   color: var(--text-h);
 }
 
 code {
-  font-size: 15px;
-  line-height: 135%;
-  padding: 4px 8px;
+  font-size: 0.82em;
+  line-height: 1.35;
+  padding: 2px 6px;
   background: var(--code-bg);
+  border: 1px solid var(--hairline);
+  letter-spacing: 0;
 }
