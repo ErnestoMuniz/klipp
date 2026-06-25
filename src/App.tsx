@@ -1,5 +1,21 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { AudioApi, AudioState } from "./audio-globals";
+import {
+  AlertCircle,
+  Command,
+  LayoutGrid,
+  Music,
+  Play,
+  Plus,
+  Rows3,
+  Search,
+  Settings,
+  Square,
+  Volume1,
+  Volume2,
+  VolumeX,
+  X,
+} from "lucide-react";
 import "./App.css";
 
 type Status = "idle" | "busy";
@@ -270,7 +286,7 @@ function App() {
 
         <div className="sb-search-wrap">
           <span className="sb-search-icon" aria-hidden="true">
-            ⌕
+            <Search size={17} />
           </span>
           <input
             type="search"
@@ -287,7 +303,7 @@ function App() {
               onClick={() => setQuery("")}
               aria-label="Limpar pesquisa"
             >
-              ✕
+              <X size={11} />
             </button>
           )}
         </div>
@@ -305,7 +321,9 @@ function App() {
             aria-label="Definições"
             title="Definições"
           >
-            <span aria-hidden="true">⚙</span>
+            <span aria-hidden="true">
+              <Settings size={16} />
+            </span>
           </button>
         </div>
       </header>
@@ -313,7 +331,7 @@ function App() {
       {s.error && (
         <div className="sb-error">
           <span className="sb-error-icon" aria-hidden="true">
-            !
+            <AlertCircle size={13} />
           </span>
           <span className="sb-error-text">
             <strong>Erro:</strong> {s.error}
@@ -328,7 +346,7 @@ function App() {
       <div className="sb-toolbar">
         <div className="sb-toolbar-title">
           <span className="sb-card-icon" aria-hidden="true">
-            ♪
+            <Music size={13} />
           </span>
           <span className="sb-toolbar-label">Biblioteca</span>
           <span className="sb-count">
@@ -346,7 +364,7 @@ function App() {
               aria-pressed={density === "comfort"}
               title="Vista confortável"
             >
-              ▦
+              <LayoutGrid size={14} />
             </button>
             <button
               type="button"
@@ -355,7 +373,7 @@ function App() {
               aria-pressed={density === "compact"}
               title="Vista compacta"
             >
-              ▤
+              <Rows3 size={14} />
             </button>
           </div>
 
@@ -387,7 +405,10 @@ function App() {
             onClick={() => void onAddSounds()}
             disabled={disabled}
           >
-            <span aria-hidden="true">+</span> Adicionar
+            <span aria-hidden="true">
+              <Plus size={16} />
+            </span>{" "}
+            Adicionar
           </button>
         </div>
       </div>
@@ -395,7 +416,7 @@ function App() {
       {prefs.showHints && soundCount > 0 && (
         <div className="sb-banner sb-shortcut">
           <span className="sb-banner-icon" aria-hidden="true">
-            ⌘
+            <Command size={11} />
           </span>
           <span className="sb-banner-text">
             Clique num pad para o tocar. Em qualquer app, <code>{GLOBAL_SHORTCUT}</code> abre o
@@ -409,7 +430,7 @@ function App() {
         {s.sounds.length === 0 ? (
           <div className="sb-empty">
             <span className="sb-empty-icon" aria-hidden="true">
-              ♪
+              <Music size={24} />
             </span>
             <h2>A sua biblioteca está vazia</h2>
             <p>
@@ -422,13 +443,16 @@ function App() {
               onClick={() => void onAddSounds()}
               disabled={disabled}
             >
-              <span aria-hidden="true">+</span> Adicionar áudios
+              <span aria-hidden="true">
+                <Plus size={16} />
+              </span>{" "}
+              Adicionar áudios
             </button>
           </div>
         ) : visibleCount === 0 ? (
           <div className="sb-empty">
             <span className="sb-empty-icon" aria-hidden="true">
-              ⌕
+              <Search size={24} />
             </span>
             <h2>Nada encontrado</h2>
             <p>Nenhum áudio corresponde a “{query}”.</p>
@@ -487,7 +511,7 @@ function App() {
             onClick={() => setSettingsOpen(false)}
             aria-label="Fechar definições"
           >
-            ✕
+            <X size={16} />
           </button>
         </div>
 
@@ -567,7 +591,15 @@ function App() {
           title={playing ? "Parar" : "Sem reprodução"}
           aria-label={playing ? "Parar reprodução" : "Sem reprodução"}
         >
-          {playing ? <span aria-hidden="true">■</span> : <span aria-hidden="true">▶</span>}
+          {playing ? (
+            <span aria-hidden="true">
+              <Square size={13} />
+            </span>
+          ) : (
+            <span aria-hidden="true">
+              <Play size={13} />
+            </span>
+          )}
         </button>
 
         <div className="sb-bar-now">
@@ -593,7 +625,13 @@ function App() {
             aria-label={effectiveMuted ? "Reativar som" : "Silenciar"}
             title={effectiveMuted ? "Reativar som" : "Silenciar"}
           >
-            {effectiveMuted ? "🔇" : volumePct < 50 ? "🔈" : "🔊"}
+            {effectiveMuted ? (
+              <VolumeX size={15} />
+            ) : volumePct < 50 ? (
+              <Volume1 size={15} />
+            ) : (
+              <Volume2 size={15} />
+            )}
           </button>
           <input
             type="range"

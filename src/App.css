@@ -417,11 +417,7 @@
   height: 24px;
   display: grid;
   place-items: center;
-  border-radius: 50%;
-  background: #ef4444;
-  color: #fff;
-  font-weight: 800;
-  font-size: 13px;
+  color: #ef4444;
 }
 
 .sb-error-text {

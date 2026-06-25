@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties } from "react";
 import type { SoundFile } from "./audio-globals";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import "./Overlay.css";
 
 const PAGE_SIZE = 8;
@@ -266,13 +267,13 @@ function Overlay() {
               {pageCount > 1 && (
                 <div className="overlay-pages">
                   <button type="button" aria-label="Página anterior" onClick={() => changePage(-1)}>
-                    ‹
+                    <ChevronLeft size={14} />
                   </button>
                   <span>
                     {page + 1}/{pageCount}
                   </span>
                   <button type="button" aria-label="Próxima página" onClick={() => changePage(1)}>
-                    ›
+                    <ChevronRight size={14} />
                   </button>
                 </div>
               )}
