@@ -27,7 +27,7 @@ export function SettingsDrawer({
     <>
       <div
         className={cx(
-          "fixed inset-0 z-[18] bg-[rgba(20,16,10,0.42)] opacity-0 backdrop-blur-[2px] transition-opacity duration-200",
+          "fixed inset-0 z-18 bg-[rgba(20,16,10,0.42)] opacity-0 backdrop-blur-[2px] transition-opacity duration-200",
           open ? "pointer-events-auto opacity-100" : "pointer-events-none",
         )}
         onClick={onClose}
@@ -35,14 +35,14 @@ export function SettingsDrawer({
       />
       <aside
         className={cx(
-          "fixed bottom-0 right-0 top-0 z-20 flex w-[min(384px,92vw)] flex-col border-l border-[var(--border)] bg-[var(--surface)] shadow-[var(--shadow-lg)] transition-transform duration-300",
+          "fixed bottom-0 right-0 top-0 z-20 flex w-[min(384px,92vw)] flex-col border-l border-(--border) bg-(--surface) shadow-(--shadow-lg) transition-transform duration-300",
           open ? "translate-x-0" : "translate-x-full",
         )}
         aria-hidden={!open}
         aria-label="Definições"
       >
-        <div className="flex items-center justify-between border-b border-[var(--border)] bg-[linear-gradient(180deg,var(--surface-raise),var(--surface))] px-5 pb-3.5 pt-5 shadow-[var(--inset-hi)]">
-          <h2 className="text-lg font-semibold text-[var(--text-h)]">Definições</h2>
+        <div className="flex items-center justify-between border-b border-(--border) bg-[linear-gradient(180deg,var(--surface-raise),var(--surface))] px-5 pb-3.5 pt-5 shadow-(--inset-hi)">
+          <h2 className="text-lg font-semibold text-(--text-h)">Definições</h2>
           <Button variant="icon" onClick={onClose} aria-label="Fechar definições">
             <X size={16} />
           </Button>
@@ -88,11 +88,11 @@ export function SettingsDrawer({
 
           <div className="flex flex-col gap-2">
             <FieldGroup label="Dispositivo no Discord">
-              <p className="text-sm leading-normal text-[var(--text)]">
-                Defina o <strong className="text-[var(--text-h)]">dispositivo de entrada</strong>{" "}
-                como <code className="text-xs">{state.discordDeviceName}</code>.
+              <p className="text-sm leading-normal text-(--text)">
+                Defina o <strong className="text-(--text-h)">dispositivo de entrada</strong> como{" "}
+                <code className="text-xs">{state.discordDeviceName}</code>.
               </p>
-              <p className="text-sm leading-normal text-[var(--text)]">
+              <p className="text-sm leading-normal text-(--text)">
                 Atalho global <code className="text-xs">{GLOBAL_SHORTCUT}</code> abre o seletor
                 rápido · <code className="text-xs">Esc</code> fecha.
               </p>

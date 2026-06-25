@@ -23,7 +23,7 @@ export function TransportBar({
   onVolumeChange,
 }: TransportBarProps) {
   return (
-    <footer className="fixed bottom-6 left-1/2 z-10 flex w-[min(1040px,calc(100%_-_48px))] -translate-x-1/2 items-center gap-3.5 rounded-lg border border-[var(--border)] bg-[linear-gradient(180deg,var(--surface-raise),var(--surface))] px-3.5 py-3 shadow-[var(--shadow-lg),var(--inset-hi)] backdrop-blur-[14px] backdrop-saturate-[1.1] max-sm:flex-wrap max-sm:gap-3">
+    <footer className="fixed bottom-6 left-1/2 z-10 flex w-[min(1040px,calc(100%-48px))] -translate-x-1/2 items-center gap-3.5 rounded-lg border border-(--border) bg-[linear-gradient(180deg,var(--surface-raise),var(--surface))] px-3.5 py-3 shadow-[var(--shadow-lg),var(--inset-hi)] backdrop-blur-[14px] backdrop-saturate-[1.1] max-sm:flex-wrap max-sm:gap-3">
       <Button
         variant="transport"
         size="lg"
@@ -35,14 +35,14 @@ export function TransportBar({
         {playing ? <Square size={13} /> : <Play size={13} />}
       </Button>
 
-      <div className="flex min-w-0 flex-1 items-center gap-3 border-r border-[var(--border)] pr-3.5 max-sm:basis-full max-sm:border-b max-sm:border-r-0 max-sm:pb-3 max-sm:pr-0">
+      <div className="flex min-w-0 flex-1 items-center gap-3 border-r border-(--border) pr-3.5 max-sm:basis-full max-sm:border-b max-sm:border-r-0 max-sm:pb-3 max-sm:pr-0">
         <Equalizer live={Boolean(playing)} transport />
         <div className="flex min-w-0 flex-col gap-px">
-          <span className="font-mono text-xs font-semibold uppercase tracking-widest text-[var(--text-faint)]">
+          <span className="font-mono text-xs font-semibold uppercase tracking-widest text-(--text-faint)">
             {playing ? "A tocar" : "Parado"}
           </span>
           <span
-            className="max-w-[38vw] overflow-hidden text-ellipsis whitespace-nowrap text-sm font-medium text-[var(--text-h)]"
+            className="max-w-[38vw] overflow-hidden text-ellipsis whitespace-nowrap text-sm font-medium text-(--text-h)"
             title={playing ?? undefined}
           >
             {playing ? labelFor(playing) : "Pronto a reproduzir"}
@@ -68,7 +68,7 @@ export function TransportBar({
         </Button>
         <input
           type="range"
-          className="h-1.5 flex-1 accent-[var(--accent)]"
+          className="h-1.5 flex-1 accent-(--accent)"
           min={0}
           max={1}
           step={0.01}
@@ -76,7 +76,7 @@ export function TransportBar({
           onChange={(event) => onVolumeChange(Number(event.target.value))}
           aria-label="Volume"
         />
-        <span className="min-w-10 shrink-0 text-right font-mono text-xs font-semibold tabular-nums tracking-wide text-[var(--text-h)]">
+        <span className="min-w-10 shrink-0 text-right font-mono text-xs font-semibold tabular-nums tracking-wide text-(--text-h)">
           {volumePct}%
         </span>
       </div>

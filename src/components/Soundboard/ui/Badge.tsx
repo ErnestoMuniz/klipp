@@ -8,9 +8,9 @@ interface BadgeProps extends HTMLAttributes<HTMLSpanElement> {
 
 export function Badge({ children, className, tone = "accent", ...props }: BadgeProps) {
   const toneClass = {
-    accent: "border-[var(--accent-border)] bg-[var(--accent-bg)] text-[var(--accent)]",
-    neutral: "border-[var(--border)] bg-[var(--surface-sunk)] text-[var(--text)]",
-    status: "border-[var(--border)] bg-[var(--surface-sunk)] text-[var(--text)]",
+    accent: "border-(--accent-border) bg-(--accent-bg) text-(--accent)",
+    neutral: "border-(--border) bg-(--surface-sunk) text-(--text)",
+    status: "border-(--border) bg-(--surface-sunk) text-(--text)",
   }[tone];
 
   return (
