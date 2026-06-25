@@ -45,12 +45,16 @@ interface Prefs {
   density: Density;
   sort: SortMode;
   showHints: boolean;
+  volume: number;
+  muted: boolean;
 }
 
 const defaultPrefs: Prefs = {
   density: "comfort",
   sort: "name-asc",
   showHints: true,
+  volume: 1,
+  muted: false,
 };
 
 function loadPrefs(): Prefs {
@@ -80,11 +84,11 @@ function App() {
   const [state, setState] = useState<AudioState | null>(null);
   const [status, setStatus] = useState<Status>("idle");
   const [playing, setPlaying] = useState<string | null>(null);
-  const [volume, setVolume] = useState(1);
+  const [prefs, setPrefs] = useState<Prefs>(loadPrefs);
+  const [volume, setVolume] = useState(prefs.volume);
+  const [muted, setMuted] = useState(prefs.muted);
   const [fatal, setFatal] = useState<string | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [muted, setMuted] = useState(false);
-  const [prefs, setPrefs] = useState<Prefs>(loadPrefs);
   const [query, setQuery] = useState("");
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const playbackIdRef = useRef(0);
@@ -98,6 +102,11 @@ function App() {
       /* ignore */
     }
   }, [prefs]);
+
+  // Persist volume changes to prefs.
+  useEffect(() => {
+    setPrefs((p) => (p.volume === volume && p.muted === muted ? p : { ...p, volume, muted }));
+  }, [volume, muted]);
 
   useEffect(() => {
     if (!api) {

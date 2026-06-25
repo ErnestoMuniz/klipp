@@ -1,7 +1,43 @@
 import { execFile } from "node:child_process";
-import { dialog, ipcMain } from "electron";
+import { app, dialog, ipcMain } from "electron";
 import fs from "node:fs/promises";
 import path from "node:path";
+
+// ---------------------------------------------------------------------------
+// Persistent settings
+// ---------------------------------------------------------------------------
+
+interface StoredSettings {
+  micPassthrough: boolean;
+  hearClips: boolean;
+  currentMicSource: string | null;
+}
+
+const SETTINGS_FILE = "settings.json";
+
+function settingsPath(): string {
+  return path.join(app.getPath("userData"), SETTINGS_FILE);
+}
+
+async function loadSettings(): Promise<StoredSettings> {
+  const defaults: StoredSettings = {
+    micPassthrough: false,
+    hearClips: true,
+    currentMicSource: null,
+  };
+  try {
+    const raw = await fs.readFile(settingsPath(), "utf-8");
+    const parsed = JSON.parse(raw) as Partial<StoredSettings>;
+    return { ...defaults, ...parsed };
+  } catch {
+    return defaults;
+  }
+}
+
+async function saveSettings(settings: StoredSettings): Promise<void> {
+  await fs.mkdir(path.dirname(settingsPath()), { recursive: true });
+  await fs.writeFile(settingsPath(), JSON.stringify(settings, null, 2), "utf-8");
+}
 
 // Clips-only sink. The renderer plays soundboard clips here (via PULSE_SINK).
 // Keeping clips isolated from the mic lets us send ONLY clips to the user's
@@ -153,10 +189,20 @@ export class AudioManager {
       this.defaultSink = (await runPactl(["get-default-sink"])).trim();
       const defaultSource = (await runPactl(["get-default-source"])).trim();
       this.micSources = await this.listMicSources();
-      this.currentMicSource = this.micSources.some((m) => m.name === defaultSource)
-        ? defaultSource
-        : (this.micSources[0]?.name ?? null);
-      this.micPassthrough = this.currentMicSource !== null;
+
+      // Load persisted settings and validate that the saved mic source still exists.
+      const saved = await loadSettings();
+      const savedMicValid =
+        saved.currentMicSource != null &&
+        this.micSources.some((m) => m.name === saved.currentMicSource);
+      this.currentMicSource = savedMicValid
+        ? saved.currentMicSource
+        : this.micSources.some((m) => m.name === defaultSource)
+          ? defaultSource
+          : (this.micSources[0]?.name ?? null);
+      this.micPassthrough = savedMicValid ? saved.micPassthrough : this.currentMicSource !== null;
+      this.hearClips = saved.hearClips;
+
       await this.applyMicLoopback();
       await this.applyHearClips();
       this.sounds = await this.listSounds();
@@ -269,19 +315,30 @@ export class AudioManager {
   async setMicSource(name: string): Promise<AudioState> {
     this.currentMicSource = name;
     await this.applyMicLoopback();
+    await this.persistSettings();
     return this.getState();
   }
 
   async setMicPassthrough(enabled: boolean): Promise<AudioState> {
     this.micPassthrough = enabled;
     await this.applyMicLoopback();
+    await this.persistSettings();
     return this.getState();
   }
 
   async setHearClips(enabled: boolean): Promise<AudioState> {
     this.hearClips = enabled;
     await this.applyHearClips();
+    await this.persistSettings();
     return this.getState();
+  }
+
+  private async persistSettings(): Promise<void> {
+    await saveSettings({
+      micPassthrough: this.micPassthrough,
+      hearClips: this.hearClips,
+      currentMicSource: this.currentMicSource,
+    }).catch(() => {});
   }
 
   private async listSounds(): Promise<SoundFile[]> {
