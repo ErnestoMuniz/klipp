@@ -10,7 +10,7 @@ export function Card({ children, className, tone = "raised", ...props }: CardPro
   const toneClass = {
     raised:
       "rounded-lg border border-(--border) bg-[linear-gradient(180deg,var(--surface-raise),var(--surface))] shadow-[var(--shadow-sm),var(--inset-hi)]",
-    sunken: "rounded border border-(--border) bg-(--surface-sunk) shadow-(--inset-lo)",
+    sunken: "rounded-md border border-(--border) bg-(--surface-sunk) shadow-(--inset-lo)",
     dashed:
       "rounded-lg border border-dashed border-(--border-strong) bg-(--surface-sunk) shadow-(--inset-lo)",
     alert:

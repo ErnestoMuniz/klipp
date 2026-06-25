@@ -200,7 +200,7 @@ function Soundboard() {
     return (
       <section
         id="soundboard"
-        className="relative z-1 mx-auto flex min-h-svh w-full max-w-260 flex-col items-center justify-center gap-4 px-6 py-10 text-left"
+        className="relative z-1 mx-auto flex min-h-svh w-full flex-col items-center justify-center gap-4 px-6 py-10 text-left"
       >
         <div className="flex max-w-md flex-col items-center gap-5">
           <BrandLogo large />
@@ -221,7 +221,7 @@ function Soundboard() {
     <section
       id="soundboard"
       className={cx(
-        "relative z-1 mx-auto flex w-full max-w-260 flex-col gap-4 px-6 pb-32 text-left max-sm:px-3.5 max-sm:pb-36",
+        "relative z-1 mx-auto flex w-full flex-col gap-4 px-6 pb-32 text-left max-sm:px-3.5 max-sm:pb-36",
       )}
     >
       <Topbar

@@ -23,7 +23,7 @@ const quietIconButtonClass =
   "grid shrink-0 cursor-pointer place-items-center border border-(--border) bg-(--surface-sunk) text-(--text-h) shadow-(--inset-lo) hover:border-(--accent-border) hover:text-(--accent)";
 
 const transportButtonClass =
-  "grid shrink-0 place-items-center border border-(--border) bg-(--surface-sunk) text-(--text-faint) shadow-(--inset-lo) disabled:cursor-default disabled:opacity-60 enabled:cursor-pointer enabled:border-(--accent-deep) enabled:bg-[linear-gradient(180deg,var(--accent),var(--accent-deep))] enabled:text-(--accent-ink) enabled:shadow-[0_6px_18px_-8px_var(--accent-glow),inset_0_1px_0_rgba(255,255,255,0.25)] enabled:hover:bg-[linear-gradient(180deg,color-mix(in_srgb,var(--accent)_92%,#fff_8%),var(--accent-deep))] enabled:active:translate-y-px";
+  "grid shrink-0 place-items-center text-(--text-faint) disabled:cursor-default disabled:opacity-60 enabled:cursor-pointer enabled:text-(--accent) enabled:active:translate-y-px";
 
 const iconSizes: Record<ButtonSize, string> = {
   sm: "size-9 rounded-sm",

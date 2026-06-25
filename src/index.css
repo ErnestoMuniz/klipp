@@ -44,15 +44,15 @@
   --good: #2f8f5b;
 
   --shadow-sm: 0 1px 2px rgba(40, 30, 15, 0.06), 0 1px 1px rgba(40, 30, 15, 0.04);
-  --shadow: 0 2px 4px rgba(40, 30, 15, 0.05), 0 8px 20px -10px rgba(40, 30, 15, 0.18);
+  --shadow-md: 0 2px 4px rgba(40, 30, 15, 0.05), 0 8px 20px -10px rgba(40, 30, 15, 0.18);
   --shadow-lg: 0 4px 8px rgba(40, 30, 15, 0.06), 0 24px 48px -20px rgba(40, 30, 15, 0.28);
   --inset-hi: inset 0 1px 0 rgba(255, 255, 255, 0.65);
   --inset-lo: inset 0 1px 2px rgba(40, 30, 15, 0.1);
 
   /* fonts */
-  --sans: "Inter", system-ui, "Segoe UI", Roboto, sans-serif;
+  --sans: "Geist", system-ui, "Segoe UI", Roboto, sans-serif;
   --display: var(--sans);
-  --mono: "JetBrains Mono", ui-monospace, "SF Mono", Consolas, monospace;
+  --mono: "Geist Mono", ui-monospace, "SF Mono", Consolas, monospace;
   --font-sans: var(--sans);
   --font-mono: var(--mono);
 
@@ -107,7 +107,7 @@
     --good: #4caa72;
 
     --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4), 0 1px 1px rgba(0, 0, 0, 0.3);
-    --shadow: 0 2px 4px rgba(0, 0, 0, 0.4), 0 10px 24px -12px rgba(0, 0, 0, 0.6);
+    --shadow-md: 0 2px 4px rgba(0, 0, 0, 0.4), 0 10px 24px -12px rgba(0, 0, 0, 0.6);
     --shadow-lg: 0 4px 10px rgba(0, 0, 0, 0.45), 0 28px 56px -24px rgba(0, 0, 0, 0.7);
     --inset-hi: inset 0 1px 0 rgba(255, 248, 235, 0.06);
     --inset-lo: inset 0 1px 2px rgba(0, 0, 0, 0.5);
@@ -120,8 +120,7 @@
 
 /* ===== App frame ===== */
 #root {
-  width: 1126px;
-  max-width: 100%;
+  width: 100%;
   margin: 0 auto;
   text-align: center;
   min-height: 100svh;
@@ -130,7 +129,6 @@
   box-sizing: border-box;
   position: relative;
   background: radial-gradient(120% 60% at 50% -10%, var(--bg-2), transparent 70%), var(--bg);
-  border-inline: 1px solid var(--hairline);
 }
 
 /* faint film grain — adds texture so surfaces don't read as flat plastic */

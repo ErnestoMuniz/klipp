@@ -1,26 +1,5 @@
-import type {
-  InputHTMLAttributes,
-  LabelHTMLAttributes,
-  ReactNode,
-  SelectHTMLAttributes,
-} from "react";
-import { cx, formSelectClass } from "../styles";
-
-interface SelectProps extends SelectHTMLAttributes<HTMLSelectElement> {
-  label: string;
-}
-
-export function Select({ children, className, label, ...props }: SelectProps) {
-  return (
-    <label>
-      <span className="sr-only">{label}</span>
-      <select className={cx(formSelectClass, className)} {...props}>
-        {children}
-      </select>
-    </label>
-  );
-}
-
+import type { InputHTMLAttributes, LabelHTMLAttributes, ReactNode } from "react";
+import { cx } from "../styles";
 interface SwitchProps extends Omit<InputHTMLAttributes<HTMLInputElement>, "type"> {
   label: string;
 }
