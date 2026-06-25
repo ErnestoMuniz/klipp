@@ -14,3 +14,9 @@ Docs are local at `node_modules/vite-plus/docs` or online at https://viteplus.de
 - [ ] If setup, runtime, or package-manager behavior looks wrong, run `vp env doctor` and include its output when asking for help.
 
 <!--VITE PLUS END-->
+
+<!-- Rules -->
+
+- When writing Tailwind classes with CSS variables, you should use `example-(--var-name)` instead of `example-[var(--var-name)]`.
+- Don't use `z-[8]`, use `z-8`.
+- Try to use standard Tailwind classes like `rounded-sm` instead of custom `rounded-[8px]`.
