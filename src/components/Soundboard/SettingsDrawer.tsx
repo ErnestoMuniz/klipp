@@ -1,27 +1,33 @@
-import { X } from "lucide-react";
+import { Moon, Sun, SunMoon, X } from "lucide-react";
 import type { AudioState } from "../../audio-globals";
 import { GLOBAL_SHORTCUT } from "./types";
+import type { Theme } from "./types";
 import { cx, dividerClass } from "./styles";
 import { Button, FieldGroup, Select, Switch } from "./ui";
+import { themeLabels } from "./theme";
 
 interface SettingsDrawerProps {
   disabled: boolean;
   open: boolean;
   state: AudioState;
+  theme: Theme;
   onClose: () => void;
   onHearClips: (enabled: boolean) => void;
   onMicPassthrough: (enabled: boolean) => void;
   onMicSource: (name: string) => void;
+  onThemeChange: (theme: Theme) => void;
 }
 
 export function SettingsDrawer({
   disabled,
   open,
   state,
+  theme,
   onClose,
   onHearClips,
   onMicPassthrough,
   onMicSource,
+  onThemeChange,
 }: SettingsDrawerProps) {
   return (
     <>
@@ -85,6 +91,31 @@ export function SettingsDrawer({
           </FieldGroup>
 
           <div className={dividerClass} />
+
+          <FieldGroup label="Tema">
+            <div className="flex gap-2">
+              {(["light", "dark", "system"] as const).map((value) => (
+                <button
+                  key={value}
+                  type="button"
+                  className={cx(
+                    "flex flex-1 flex-col items-center gap-1.5 rounded-md border px-3 py-2.5 text-xs font-medium transition-colors",
+                    theme === value
+                      ? "border-(--accent) bg-(--accent-bg) text-(--accent)"
+                      : "border-(--border) bg-(--surface-sunk) text-(--text) hover:border-(--accent-border)",
+                  )}
+                  onClick={() => onThemeChange(value)}
+                  disabled={disabled}
+                  aria-pressed={theme === value}
+                >
+                  {value === "light" && <Sun size={18} />}
+                  {value === "dark" && <Moon size={18} />}
+                  {value === "system" && <SunMoon size={18} />}
+                  <span>{themeLabels[value]}</span>
+                </button>
+              ))}
+            </div>
+          </FieldGroup>
 
           <div className="flex flex-col gap-2">
             <FieldGroup label="Dispositivo no Discord">

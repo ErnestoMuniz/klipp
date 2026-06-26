@@ -4,6 +4,7 @@ import type { SoundFile } from "../../audio-globals";
 export type Status = "idle" | "busy";
 export type Density = "comfort" | "compact";
 export type SortMode = "name-asc" | "name-desc" | "recent";
+export type Theme = "light" | "dark" | "system";
 /** Library-level view filter. "overlay" filters to sounds in the quick picker. */
 export type ViewFilter = "all" | "overlay";
 
@@ -16,6 +17,7 @@ export interface Prefs {
   showHints: boolean;
   volume: number;
   muted: boolean;
+  theme: Theme;
   /** Library-only filter that hides sounds not added to the overlay picker. */
   onlyOverlay: boolean;
 }
@@ -26,6 +28,7 @@ export const defaultPrefs: Prefs = {
   showHints: true,
   volume: 1,
   muted: false,
+  theme: "system",
   onlyOverlay: false,
 };
 

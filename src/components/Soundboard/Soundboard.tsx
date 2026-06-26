@@ -13,7 +13,8 @@ import { TransportBar } from "./TransportBar";
 import { Button } from "./ui";
 import { cx } from "./styles";
 import { PREFS_KEY, emptyState, loadPrefs, soundLabel } from "./types";
-import type { Prefs, Status } from "./types";
+import type { Prefs, Status, Theme } from "./types";
+import { applyTheme } from "./theme";
 
 function Soundboard() {
   const [state, setState] = useState<AudioState | null>(null);
@@ -22,6 +23,7 @@ function Soundboard() {
   const [prefs, setPrefs] = useState<Prefs>(loadPrefs);
   const [volume, setVolume] = useState(prefs.volume);
   const [muted, setMuted] = useState(prefs.muted);
+  const [theme, setTheme] = useState<Theme>(prefs.theme);
   const [fatal, setFatal] = useState<string | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [editingSound, setEditingSound] = useState<SoundFile | null>(null);
@@ -38,6 +40,21 @@ function Soundboard() {
       /* ignore */
     }
   }, [prefs]);
+
+  // Apply theme whenever it changes
+  useEffect(() => {
+    applyTheme(theme);
+    setPrefs((current) => (current.theme === theme ? current : { ...current, theme }));
+  }, [theme]);
+
+  // Listen for system theme changes when in "system" mode
+  useEffect(() => {
+    if (theme !== "system") return;
+    const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
+    const handler = () => applyTheme("system");
+    mediaQuery.addEventListener("change", handler);
+    return () => mediaQuery.removeEventListener("change", handler);
+  }, [theme]);
 
   useEffect(() => {
     setPrefs((current) =>
@@ -299,10 +316,12 @@ function Soundboard() {
         disabled={disabled}
         open={settingsOpen}
         state={soundboardState}
+        theme={theme}
         onClose={() => setSettingsOpen(false)}
         onHearClips={(enabled) => void onHearClips(enabled)}
         onMicPassthrough={(enabled) => void onMicPassthrough(enabled)}
         onMicSource={(name) => void onMicSource(name)}
+        onThemeChange={setTheme}
       />
 
       <TransportBar

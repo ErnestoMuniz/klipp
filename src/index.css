@@ -21,26 +21,25 @@
   --text-faint: #8a8377;
 
   /* surfaces */
-  --bg: #f3efe6; /* warm paper */
-  --bg-2: #ece7da; /* recessed paper */
-  --surface: #fbf9f3; /* raised card */
-  --surface-raise: #ffffff; /* top of gradient */
-  --surface-sunk: #ede8db; /* input / well */
-  --border: #ddd6c6;
-  --border-strong: #c9c1ae;
+  --bg: #f0eee9;
+  --bg-2: #ebe9e4;
+  --surface: #f6f4ee;
+  --surface-raise: #ffffff;
+  --surface-sunk: #ebe9e3;
+  --border: #dbd8d1;
+  --border-strong: #c5c2bb;
   --hairline: rgba(24, 19, 13, 0.06);
 
   /* code / chips */
-  --code-bg: #e7e1d2;
+  --code-bg: #e6e3dd;
 
-  /* signal accent (the REC light) */
-  --accent: #e2482a;
-  --accent-deep: #b8351b;
-  --accent-ink: #fff7f2;
-  --accent-bg: rgba(226, 72, 42, 0.1);
-  --accent-bg-strong: rgba(226, 72, 42, 0.18);
-  --accent-border: rgba(226, 72, 42, 0.42);
-  --accent-glow: rgba(226, 72, 42, 0.35);
+  --accent: #42a1ff;
+  --accent-deep: #2a80e2;
+  --accent-ink: #f2f8ff;
+  --accent-bg: rgba(66, 189, 255, 0.13);
+  --accent-bg-strong: rgba(66, 183, 255, 0.22);
+  --accent-border: rgba(66, 192, 255, 0.5);
+  --accent-glow: rgba(66, 183, 255, 0.4);
 
   /* secondary — deep ink used for "pressed" / contrast tiles */
   --ink: #1c1710;
@@ -81,15 +80,17 @@
   }
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
+/* Dark theme variables — applied via .dark class (manual) or system media query */
+:root.dark,
+:root:not(.light) {
+  @media (prefers-color-scheme: dark) {
     --text: #9b948a;
     --text-h: #f1ede4;
     --text-faint: #6f695f;
 
-    --bg: #0e0e0e; /* warm charcoal */
+    --bg: #0e0e0e;
     --bg-2: #161616;
-    --surface: #1a1a1a;
+    --surface: #181818;
     --surface-raise: #1e1e1e;
     --surface-sunk: #141414;
     --border: #2b2b2b;
@@ -118,10 +119,6 @@
     --inset-hi: inset 0 1px 0 rgba(255, 248, 235, 0.06);
     --inset-lo: inset 0 1px 2px rgba(0, 0, 0, 0.5);
   }
-
-  #social .button-icon {
-    filter: invert(1) brightness(2);
-  }
 }
 
 /* ===== Frameless window drag regions ======
@@ -138,40 +135,14 @@
   app-region: no-drag;
 }
 
-/* ===== macOS-style traffic-light window controls =====
-   Rendered in the frameless main window's Topbar. Three colored circles
-   (close / minimize / maximize) like native macOS traffic lights, with a
-   dark glyph revealed on hover. Colors stay vivid in both themes.
+/* ===== Window controls =====
+   Rendered in the frameless main window's Topbar. Three square buttons
+   (minimize / maximize / close) shown bare, glyph always visible.
    ====================================================================== */
-.tl {
-  --tl-close: #ff5f57;
-  --tl-minimize: #ffbd2e;
-  --tl-maximize: #28c940;
-  --tl-glyph: #4d0000;
-}
-.tl-close {
-  background: var(--tl-close);
-  --tl-glyph: #7a0a09;
-  box-shadow: inset 0 0 0 0.4px rgba(0, 0, 0, 0.18);
-}
-.tl-minimize {
-  background: var(--tl-minimize);
-  --tl-glyph: #8a5a00;
-  box-shadow: inset 0 0 0 0.4px rgba(0, 0, 0, 0.18);
-}
-.tl-maximize {
-  background: var(--tl-maximize);
-  --tl-glyph: #0b4d18;
-  box-shadow: inset 0 0 0 0.4px rgba(0, 0, 0, 0.18);
-}
-.tl .tl-stroke {
-  stroke: var(--tl-glyph);
-}
 @media (max-width: 600px) {
-  /* keep traffic lights tappable but a touch smaller on tiny screens */
-  .tl {
-    width: 13px;
-    height: 13px;
+  .tb-btn {
+    width: 18px;
+    height: 18px;
   }
 }
 
@@ -200,10 +171,13 @@
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.035'/%3E%3C/svg%3E");
 }
 
-@media (prefers-color-scheme: dark) {
-  #root::before {
-    mix-blend-mode: screen;
-    opacity: 0.35;
+:root.dark #root::before,
+:root:not(.light) {
+  @media (prefers-color-scheme: dark) {
+    #root::before {
+      mix-blend-mode: screen;
+      opacity: 0.35;
+    }
   }
 }
 
@@ -317,14 +291,18 @@ code {
 .sb-scroll::-webkit-scrollbar-corner {
   background: transparent;
 }
-@media (prefers-color-scheme: dark) {
-  .sb-scroll::-webkit-scrollbar-track {
-    box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.5);
-  }
-  .sb-scroll::-webkit-scrollbar-thumb {
-    background: linear-gradient(180deg, var(--surface-raise), var(--border-strong));
-    box-shadow:
-      inset 0 1px 0 rgba(255, 248, 235, 0.08),
-      0 1px 2px rgba(0, 0, 0, 0.4);
+
+:root.dark .sb-scroll::-webkit-scrollbar-track,
+:root:not(.light) {
+  @media (prefers-color-scheme: dark) {
+    .sb-scroll::-webkit-scrollbar-track {
+      box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.5);
+    }
+    .sb-scroll::-webkit-scrollbar-thumb {
+      background: linear-gradient(180deg, var(--surface-raise), var(--border-strong));
+      box-shadow:
+        inset 0 1px 0 rgba(255, 248, 235, 0.08),
+        0 1px 2px rgba(0, 0, 0, 0.4);
+    }
   }
 }
