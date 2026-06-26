@@ -12,7 +12,19 @@ dist
 dist-ssr
 dist-electron
 *.local
-public
+
+# Build / packaging output
+release
+out
+*.tsbuildinfo
+
+# Environment files
+.env
+.env.*
+!.env.example
+
+# vite-plus staged lint cache
+.vite-hooks/_
 
 # Editor directories and files
 .vscode/*
