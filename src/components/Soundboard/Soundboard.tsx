@@ -1,15 +1,16 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { AudioApi, AudioState } from "../../audio-globals";
+import type { AudioApi, AudioState, SoundFile, SoundMetadata } from "../../audio-globals";
 import { BrandLogo } from "./BrandLogo";
 import { ErrorBanner } from "./ErrorBanner";
 import { LibraryToolbar } from "./LibraryToolbar";
 import { SettingsDrawer } from "./SettingsDrawer";
 import { ShortcutBanner } from "./ShortcutBanner";
+import { SoundEditor } from "./SoundEditor";
 import { SoundStage } from "./SoundStage";
 import { Topbar } from "./Topbar";
 import { TransportBar } from "./TransportBar";
 import { cx } from "./styles";
-import { PREFS_KEY, emptyState, labelFor, loadPrefs } from "./types";
+import { PREFS_KEY, emptyState, loadPrefs, soundLabel } from "./types";
 import type { Prefs, Status } from "./types";
 
 function Soundboard() {
@@ -21,6 +22,7 @@ function Soundboard() {
   const [muted, setMuted] = useState(prefs.muted);
   const [fatal, setFatal] = useState<string | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [editingSound, setEditingSound] = useState<SoundFile | null>(null);
   const [query, setQuery] = useState("");
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const playbackIdRef = useRef(0);
@@ -132,7 +134,16 @@ function Soundboard() {
     if (next) setState(next);
   }
 
-  function play(url: string, name: string) {
+  async function onSaveSoundMetadata(sound: SoundFile, metadata: SoundMetadata) {
+    if (!api) return;
+    const next = await run(() => api.updateSoundMetadata(sound.url, metadata));
+    if (next) {
+      setState(next);
+      setEditingSound(null);
+    }
+  }
+
+  function play(url: string) {
     const previous = audioRef.current;
     if (previous) {
       previous.onended = null;
@@ -146,7 +157,7 @@ function Soundboard() {
     const element = new Audio(url);
     element.volume = muted ? 0 : volume;
     audioRef.current = element;
-    setPlaying(name);
+    setPlaying(url);
 
     const finish = () => {
       if (playbackIdRef.current !== playbackId || audioRef.current !== element) return;
@@ -179,19 +190,19 @@ function Soundboard() {
     const normalizedQuery = query.trim().toLowerCase();
     const list = normalizedQuery
       ? soundboardState.sounds.filter((sound) =>
-          labelFor(sound.name).toLowerCase().includes(normalizedQuery),
+          soundLabel(sound).toLowerCase().includes(normalizedQuery),
         )
       : soundboardState.sounds;
     const sorted = [...list];
     switch (prefs.sort) {
       case "name-desc":
-        sorted.sort((a, b) => labelFor(b.name).localeCompare(labelFor(a.name)));
+        sorted.sort((a, b) => soundLabel(b).localeCompare(soundLabel(a)));
         break;
       case "recent":
         sorted.reverse();
         break;
       default:
-        sorted.sort((a, b) => labelFor(a.name).localeCompare(labelFor(b.name)));
+        sorted.sort((a, b) => soundLabel(a).localeCompare(soundLabel(b)));
     }
     return sorted;
   }, [soundboardState.sounds, query, prefs.sort]);
@@ -216,6 +227,9 @@ function Soundboard() {
   const soundCount = soundboardState.sounds.length;
   const effectiveMuted = muted || volumePct === 0;
   const visibleCount = filtered.length;
+  const playingSound = playing
+    ? soundboardState.sounds.find((sound) => sound.url === playing)
+    : null;
 
   return (
     <section
@@ -261,7 +275,15 @@ function Soundboard() {
         sounds={filtered}
         totalSounds={soundCount}
         onAddSounds={() => void onAddSounds()}
+        onEdit={setEditingSound}
         onPlay={play}
+      />
+
+      <SoundEditor
+        disabled={disabled}
+        sound={editingSound}
+        onClose={() => setEditingSound(null)}
+        onSave={(sound, metadata) => void onSaveSoundMetadata(sound, metadata)}
       />
 
       <SettingsDrawer
@@ -276,7 +298,7 @@ function Soundboard() {
 
       <TransportBar
         effectiveMuted={effectiveMuted}
-        playing={playing}
+        playing={playingSound ? soundLabel(playingSound) : null}
         volume={volume}
         volumePct={volumePct}
         onMutedChange={setMuted}

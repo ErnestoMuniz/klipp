@@ -12,7 +12,8 @@ interface SoundStageProps {
   sounds: SoundFile[];
   totalSounds: number;
   onAddSounds: () => void;
-  onPlay: (url: string, name: string) => void;
+  onEdit: (sound: SoundFile) => void;
+  onPlay: (url: string) => void;
 }
 
 export function SoundStage({
@@ -23,6 +24,7 @@ export function SoundStage({
   sounds,
   totalSounds,
   onAddSounds,
+  onEdit,
   onPlay,
 }: SoundStageProps) {
   if (totalSounds === 0) {
@@ -55,8 +57,9 @@ export function SoundStage({
           <SoundPad
             key={sound.url}
             density={density}
-            isPlaying={playing === sound.name}
+            isPlaying={playing === sound.url}
             sound={sound}
+            onEdit={onEdit}
             onPlay={onPlay}
           />
         ))}

@@ -2,16 +2,21 @@ import type { SoundFile } from "../../audio-globals";
 import type { Density } from "./types";
 import { cx } from "./styles";
 import { Equalizer } from "./Equalizer";
-import { initials, labelFor } from "./types";
+import { Edit3 } from "lucide-react";
+import { emojiFontFamily } from "./emojiFont";
+import { soundLabel } from "./types";
 
 interface SoundPadProps {
   density: Density;
   isPlaying: boolean;
   sound: SoundFile;
-  onPlay: (url: string, name: string) => void;
+  onEdit: (sound: SoundFile) => void;
+  onPlay: (url: string) => void;
 }
 
-export function SoundPad({ density, isPlaying, sound, onPlay }: SoundPadProps) {
+export function SoundPad({ density, isPlaying, sound, onEdit, onPlay }: SoundPadProps) {
+  const label = soundLabel(sound);
+
   return (
     <button
       type="button"
@@ -23,9 +28,27 @@ export function SoundPad({ density, isPlaying, sound, onPlay }: SoundPadProps) {
         isPlaying &&
           "border-(--accent) bg-[linear-gradient(180deg,var(--accent-bg-strong),var(--accent-bg))] shadow-[0_0_0_3px_var(--accent-bg),0_8px_24px_-12px_var(--accent-glow),var(--inset-hi)] after:opacity-0",
       )}
-      onClick={() => onPlay(sound.url, sound.name)}
-      title={labelFor(sound.name)}
+      onClick={() => onPlay(sound.url)}
+      title={label}
     >
+      <span
+        className="absolute right-2 top-2 z-1 grid size-8 place-items-center rounded-sm border border-(--border) bg-(--surface-sunk) text-(--text-faint) opacity-0 shadow-(--inset-lo) transition hover:border-(--accent-border) hover:text-(--accent) group-hover:opacity-100 focus-visible:opacity-100"
+        role="button"
+        tabIndex={0}
+        title="Editar áudio"
+        onClick={(event) => {
+          event.stopPropagation();
+          onEdit(sound);
+        }}
+        onKeyDown={(event) => {
+          if (event.key !== "Enter" && event.key !== " ") return;
+          event.preventDefault();
+          event.stopPropagation();
+          onEdit(sound);
+        }}
+      >
+        <Edit3 size={15} />
+      </span>
       <span
         className={cx(
           "relative grid min-h-0 place-items-center overflow-hidden rounded-xl border border-(--border) bg-(--surface-sunk) shadow-(--inset-lo) transition group-hover:border-(--accent-border) after:absolute after:right-2 after:top-2 after:size-1 after:rounded-full after:bg-(--border-strong) after:transition",
@@ -40,11 +63,12 @@ export function SoundPad({ density, isPlaying, sound, onPlay }: SoundPadProps) {
         ) : (
           <span
             className={cx(
-              "font-mono font-semibold text-(--text-faint) transition group-hover:text-(--accent)",
-              density === "comfort" ? "text-xl" : "text-sm",
+              "font-semibold text-(--text-h) transition group-hover:text-(--accent)",
+              density === "comfort" ? "text-4xl" : "text-xl",
             )}
+            style={{ fontFamily: emojiFontFamily }}
           >
-            {initials(sound.name)}
+            {sound.emoji}
           </span>
         )}
       </span>
@@ -54,7 +78,7 @@ export function SoundPad({ density, isPlaying, sound, onPlay }: SoundPadProps) {
           density === "comfort" ? "line-clamp-2 shrink-0" : "flex-1 [-webkit-line-clamp:1]",
         )}
       >
-        {labelFor(sound.name)}
+        {label}
       </span>
       <span
         className={cx(
