@@ -42,7 +42,7 @@ export function LibraryToolbar({
       </div>
 
       <div className="inline-flex flex-wrap items-center gap-2.5">
-        <div className="flex h-10 min-w-56 flex-1 items-center gap-2 rounded-lg border border-(--border) bg-(--surface-sunk) px-3 shadow-(--inset-lo) transition focus-within:border-(--accent-border) focus-within:bg-(--surface) focus-within:shadow-[0_0_0_4px_var(--accent-bg),var(--inset-hi)]">
+        <div className="flex h-10 min-w-56 flex-1 items-center gap-2 rounded-md border border-(--border) bg-(--surface-sunk) px-3 shadow-(--inset-lo) transition focus-within:border-(--accent-border) focus-within:bg-(--surface) focus-within:shadow-[0_0_0_4px_var(--accent-bg),var(--inset-hi)]">
           <span className="shrink-0 text-(--text-faint)" aria-hidden="true">
             <Search size={17} />
           </span>

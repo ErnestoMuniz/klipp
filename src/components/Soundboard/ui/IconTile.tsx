@@ -16,7 +16,7 @@ export function IconTile({ children, className, size = "md", ...props }: IconTil
   return (
     <span
       className={cx(
-        "grid shrink-0 place-items-center bg-[linear-gradient(160deg,var(--border),var(--surface-raise))] text-(--accent) shadow-[var(--shadow-sm),var(--inset-hi)]",
+        "grid shrink-0 place-items-center bg-[linear-gradient(160deg,var(--surface-raise),var(--surface))] text-(--accent) shadow-[var(--shadow-sm),var(--inset-hi)]",
         size === "sm" && "bg-(--ink) shadow-none",
         sizes[size],
         className,

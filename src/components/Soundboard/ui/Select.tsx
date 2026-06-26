@@ -230,7 +230,7 @@ export function Select({
         createPortal(
           <div
             ref={menuRef}
-            className="z-50 max-h-56 overflow-y-auto rounded-sm border border-(--border) bg-(--surface) py-1 shadow-(--shadow-lg) outline-none"
+            className="z-50 max-h-56 overflow-y-auto rounded-md border border-(--border) bg-(--surface) py-0 mt-1 shadow-(--shadow-lg) outline-none"
             style={{
               position: "fixed",
               left: position.left,
@@ -257,19 +257,19 @@ export function Select({
                       onMouseEnter={() => setHighlight(index)}
                       onClick={() => choose(option)}
                       className={cx(
-                        "flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-sm transition",
+                        "flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-sm transition hover:bg-(--accent-bg)",
                         option.disabled
                           ? "cursor-not-allowed text-(--text-faint)"
                           : "cursor-pointer text-(--text-h)",
                         index === highlight &&
                           !option.disabled &&
-                          "bg-(--accent-bg) text-(--accent)",
+                          "bg-(--accent-bg-strong) text-(--accent)",
                         active && "font-semibold",
                       )}
                     >
                       <span className="truncate">{option.label}</span>
                       {active && (
-                        <Check size={14} aria-hidden="true" className="shrink-0 text-(--accent)" />
+                        <Check size={14} aria-hidden="true" className="shrink-0 text-(--ink)" />
                       )}
                     </button>
                   </li>
