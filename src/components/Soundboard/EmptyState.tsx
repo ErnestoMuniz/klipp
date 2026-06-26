@@ -27,8 +27,8 @@ export function EmptyState({ disabled = false, query = "", type, onAddSounds }: 
       ) : (
         <>
           <p className="max-w-105 leading-normal">
-            Adicione ficheiros de áudio com “Adicionar” ou coloque-os em{" "}
-            <code className="text-xs">public/sounds/</code> e reinicie.
+            Adicione ficheiros de áudio com “Adicionar”. Eles são guardados na pasta de dados do
+            utilizador e persistem entre atualizações.
           </p>
           <Button className="mt-2" variant="primary" onClick={onAddSounds} disabled={disabled}>
             <Plus size={16} aria-hidden="true" />

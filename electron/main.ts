@@ -6,17 +6,34 @@ import {
   globalShortcut,
   ipcMain,
   nativeImage,
+  protocol,
   screen,
   type Display,
 } from "electron";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { uIOhook, UiohookKey, type UiohookKeyboardEvent } from "uiohook-napi";
-import { AudioManager, registerAudioIpc } from "./audio";
+import { AudioManager, registerAudioIpc, registerSoundProtocol, SOUND_SCHEME } from "./audio";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 app.commandLine.appendSwitch("enable-features", "GlobalShortcutsPortal");
+
+// Register the sound scheme as privileged before app ready so the renderer can
+// use it as a secure, fetch/stream-capable protocol for playing sound files
+// that live in userData (outside the read-only app bundle).
+protocol.registerSchemesAsPrivileged([
+  {
+    scheme: SOUND_SCHEME,
+    privileges: {
+      standard: true,
+      secure: true,
+      supportFetchAPI: true,
+      stream: true,
+      codeCache: true,
+    },
+  },
+]);
 
 process.env.APP_ROOT = path.join(__dirname, "..");
 
@@ -392,6 +409,7 @@ process.on("SIGTERM", () => {
 });
 
 void app.whenReady().then(async () => {
+  registerSoundProtocol();
   await audio.init();
   registerAudioIpc(audio);
   createWindow();

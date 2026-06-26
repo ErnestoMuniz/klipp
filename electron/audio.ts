@@ -1,7 +1,9 @@
 import { execFile } from "node:child_process";
-import { app, dialog, ipcMain } from "electron";
+import { app, dialog, ipcMain, protocol } from "electron";
 import fs from "node:fs/promises";
+import { createReadStream } from "node:fs";
 import path from "node:path";
+import { Readable } from "node:stream";
 
 // ---------------------------------------------------------------------------
 // Persistent settings
@@ -15,6 +17,11 @@ interface StoredSettings {
 
 const SETTINGS_FILE = "settings.json";
 const SOUND_METADATA_FILE = "sound-metadata.json";
+
+/** Custom privileged scheme that streams sound files from userData. */
+export const SOUND_SCHEME = "klipp-sound";
+/** Cosmetically used as the URL host; the filename lives in the path. */
+const SOUND_HOST = "sounds";
 
 function settingsPath(): string {
   return path.join(app.getPath("userData"), SETTINGS_FILE);
@@ -51,16 +58,40 @@ export interface SoundMetadata {
   inOverlay?: boolean;
 }
 
+// Metadata is keyed by the bare filename so it stays stable even if the URL
+// scheme used to address sounds changes.
 type StoredSoundMetadata = Record<string, Partial<SoundMetadata>>;
 
 async function loadSoundMetadata(): Promise<StoredSoundMetadata> {
+  let raw: StoredSoundMetadata = {};
   try {
-    const raw = await fs.readFile(soundMetadataPath(), "utf-8");
-    const parsed = JSON.parse(raw) as StoredSoundMetadata;
-    return parsed && typeof parsed === "object" ? parsed : {};
+    const file = await fs.readFile(soundMetadataPath(), "utf-8");
+    const parsed = JSON.parse(file) as StoredSoundMetadata;
+    if (parsed && typeof parsed === "object") raw = parsed;
   } catch {
     return {};
   }
+
+  // Migrate legacy keys ("sounds/<encodeURIComponent(name)>") to bare names.
+  let migrated = false;
+  const migratedMeta: StoredSoundMetadata = {};
+  for (const [key, value] of Object.entries(raw)) {
+    if (key.startsWith("sounds/")) {
+      try {
+        const name = decodeURIComponent(key.slice("sounds/".length));
+        if (!(name in migratedMeta)) {
+          migratedMeta[name] = value;
+          migrated = true;
+          continue;
+        }
+      } catch {
+        /* fall through to keep original key */
+      }
+    }
+    migratedMeta[key] = value;
+  }
+  if (migrated) await saveSoundMetadata(migratedMeta).catch(() => {});
+  return migratedMeta;
 }
 
 async function saveSoundMetadata(metadata: StoredSoundMetadata): Promise<void> {
@@ -196,8 +227,15 @@ export class AudioManager {
   private soundMetadata: StoredSoundMetadata = {};
 
   private soundsDir(): string {
-    const root = process.env.APP_ROOT ?? process.cwd();
-    return path.join(root, "public", SOUNDS_SUBDIR);
+    // Sounds are user data, not app resources: they must be writable in a
+    // packaged build (where the bundle is a read-only asar) and survive app
+    // updates. userData is the per-user application data directory.
+    return path.join(app.getPath("userData"), SOUNDS_SUBDIR);
+  }
+
+  /** URL the renderer uses to play a sound, served by the SOUND_SCHEME handler. */
+  private soundUrl(name: string): string {
+    return `${SOUND_SCHEME}://${SOUND_HOST}/${encodeURIComponent(name)}`;
   }
 
   getState(): AudioState {
@@ -385,8 +423,8 @@ export class AudioManager {
         .filter((name) => AUDIO_EXTS.has(path.extname(name).slice(1).toLowerCase()))
         .sort((a, b) => a.localeCompare(b))
         .map((name) => {
-          const url = `sounds/${encodeURIComponent(name)}`;
-          const metadata = this.soundMetadata[url] ?? {};
+          const url = this.soundUrl(name);
+          const metadata = this.soundMetadata[name] ?? {};
           const displayName =
             typeof metadata.displayName === "string" && metadata.displayName.trim()
               ? metadata.displayName.trim()
@@ -420,7 +458,7 @@ export class AudioManager {
     const inOverlay = metadata.inOverlay ?? sound.inOverlay;
     this.soundMetadata = {
       ...this.soundMetadata,
-      [url]: { displayName, emoji, inOverlay },
+      [sound.name]: { displayName, emoji, inOverlay },
     };
     await saveSoundMetadata(this.soundMetadata);
     this.sounds = await this.listSounds();
@@ -457,6 +495,90 @@ export class AudioManager {
     }
     this.loaded = [];
   }
+}
+
+const MIME_BY_EXT: Record<string, string> = {
+  mp3: "audio/mpeg",
+  wav: "audio/wav",
+  ogg: "audio/ogg",
+  flac: "audio/flac",
+  m4a: "audio/mp4",
+  opus: "audio/ogg",
+  webm: "audio/webm",
+  aac: "audio/aac",
+};
+
+/**
+ * Serves sound files from the userData sounds directory to the renderer via
+ * the `klipp-sound://` scheme. Works identically in dev and packaged builds,
+ * supports `new Audio(url)`, and honors Range requests for seeking.
+ *
+ * Must be called from `registerSchemesAsPrivileged` (in main, before app ready)
+ * for the scheme to be usable as a secure, fetch-capable, streaming scheme.
+ */
+export function registerSoundProtocol(): void {
+  const dir = path.join(app.getPath("userData"), SOUNDS_SUBDIR);
+
+  protocol.handle(SOUND_SCHEME, async (request) => {
+    const parsed = new URL(request.url);
+    const name = decodeURIComponent(parsed.pathname.slice(1));
+    if (!name || name.includes("/") || name.includes("\\")) {
+      return new Response("Not found", { status: 404 });
+    }
+
+    const filePath = path.join(dir, name);
+    // Guard against traversal: the resolved path must stay inside `dir`.
+    const relative = path.relative(dir, filePath);
+    if (relative.startsWith("..") || path.isAbsolute(relative)) {
+      return new Response("Not found", { status: 404 });
+    }
+
+    let stats;
+    try {
+      stats = await fs.stat(filePath);
+    } catch {
+      return new Response("Not found", { status: 404 });
+    }
+    if (!stats.isFile()) return new Response("Not found", { status: 404 });
+
+    const mime =
+      MIME_BY_EXT[path.extname(name).slice(1).toLowerCase()] ?? "application/octet-stream";
+
+    const range = request.headers.get("range");
+    if (range) {
+      const match = /^bytes=(\d+)-(\d*)$/.exec(range);
+      if (match) {
+        const start = Number.parseInt(match[1], 10);
+        const end = match[2] ? Number.parseInt(match[2], 10) : stats.size - 1;
+        if (Number.isNaN(start) || Number.isNaN(end) || start > end || end >= stats.size) {
+          return new Response("Range Not Satisfiable", {
+            status: 416,
+            headers: { "content-range": `bytes */${stats.size}` },
+          });
+        }
+        const body = Readable.toWeb(createReadStream(filePath, { start, end })) as ReadableStream;
+        return new Response(body, {
+          status: 206,
+          headers: {
+            "content-type": mime,
+            "content-length": String(end - start + 1),
+            "content-range": `bytes ${start}-${end}/${stats.size}`,
+            "accept-ranges": "bytes",
+          },
+        });
+      }
+    }
+
+    const body = Readable.toWeb(createReadStream(filePath)) as ReadableStream;
+    return new Response(body, {
+      status: 200,
+      headers: {
+        "content-type": mime,
+        "content-length": String(stats.size),
+        "accept-ranges": "bytes",
+      },
+    });
+  });
 }
 
 export function registerAudioIpc(manager: AudioManager): void {
