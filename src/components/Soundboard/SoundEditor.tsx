@@ -6,6 +6,7 @@ import { emojiFontFamily } from "./emojiFont";
 import { Button, FieldGroup, Switch } from "./ui";
 import { soundLabel } from "./types";
 import { cx } from "./styles";
+import { useI18n } from "../../i18n";
 
 const DEFAULT_EMOJI_GROUP = EMOJI_GROUPS[0]!.label;
 type EmojiGroupLabel = (typeof EMOJI_GROUPS)[number]["label"];
@@ -34,6 +35,7 @@ interface SoundEditorProps {
 }
 
 export function SoundEditor({ disabled, sound, onClose, onSave }: SoundEditorProps) {
+  const { t } = useI18n();
   const [displayName, setDisplayName] = useState("");
   const [emoji, setEmoji] = useState("♪");
   const [inOverlay, setInOverlay] = useState(true);
@@ -53,7 +55,7 @@ export function SoundEditor({ disabled, sound, onClose, onSave }: SoundEditorPro
       className="fixed inset-0 z-30 grid place-items-center bg-black/45 px-4"
       role="dialog"
       aria-modal="true"
-      aria-label="Editar áudio"
+      aria-label={t("editor.title")}
       onMouseDown={(event) => {
         if (event.target === event.currentTarget) onClose();
       }}
@@ -71,39 +73,39 @@ export function SoundEditor({ disabled, sound, onClose, onSave }: SoundEditorPro
       >
         <header className="flex items-center justify-between gap-4">
           <div className="min-w-0">
-            <h2 className="m-0 text-lg font-semibold">Editar áudio</h2>
+            <h2 className="m-0 text-lg font-semibold">{t("editor.title")}</h2>
             <p className="m-0 truncate text-sm text-(--text-faint)">{sound.name}</p>
           </div>
-          <Button aria-label="Fechar" size="sm" variant="ghost" onClick={onClose}>
+          <Button aria-label={t("editor.closeAria")} size="sm" variant="ghost" onClick={onClose}>
             <X size={22} />
           </Button>
         </header>
 
-        <FieldGroup label="No seletor rápido (overlay)">
+        <FieldGroup label={t("editor.overlayGroup")}>
           <Switch
             checked={inOverlay}
             disabled={disabled}
-            label="Disponível no seletor rápido (atalho Alt+Shift+S)"
+            label={t("editor.overlayLabel")}
             onChange={(event) => setInOverlay(event.target.checked)}
           />
         </FieldGroup>
 
         <label className="flex flex-col gap-2 text-sm font-medium text-(--text-h)">
-          Nome
+          {t("editor.name")}
           <input
             className="min-h-11 rounded-sm border border-(--border) bg-(--surface-sunk) px-3 text-base text-(--text-h) shadow-(--inset-lo) outline-none transition placeholder:text-(--text-faint) focus:border-(--accent-border)"
             autoFocus
             value={displayName}
             onChange={(event) => setDisplayName(event.target.value)}
-            placeholder="Nome do áudio"
+            placeholder={t("editor.namePlaceholder")}
           />
         </label>
 
         <div className="flex min-h-0 flex-1 flex-col gap-3">
           <div className="font-mono text-xs font-semibold uppercase tracking-widest text-(--text-faint)">
-            Emoji
+            {t("editor.emoji")}
           </div>
-          <div className="flex gap-1 overflow-x-auto rounded-sm border border-(--border) bg-(--surface-sunk) p-1 shadow-(--inset-lo) scrollbar-none [&::-webkit-scrollbar]:hidden">
+          <div className="flex shrink-0 gap-1 overflow-x-auto rounded-sm border border-(--border) bg-(--surface-sunk) p-1 shadow-(--inset-lo) scrollbar-none [&::-webkit-scrollbar]:hidden">
             {EMOJI_GROUPS.map((group) => (
               <button
                 key={group.label}
@@ -121,7 +123,7 @@ export function SoundEditor({ disabled, sound, onClose, onSave }: SoundEditorPro
           </div>
           <div
             className={cx(
-              "min-h-70 flex-1 overflow-y-auto rounded-sm border border-(--border) bg-(--surface-sunk) p-2 shadow-(--inset-lo)",
+              "min-h-0 flex-1 overflow-y-auto rounded-sm border border-(--border) bg-(--surface-sunk) p-2 shadow-(--inset-lo)",
               emojiPickerScrollbarClass,
             )}
           >
@@ -131,7 +133,7 @@ export function SoundEditor({ disabled, sound, onClose, onSave }: SoundEditorPro
                   <h3 className="m-0 mb-1.5 font-mono text-[11px] font-semibold uppercase tracking-widest text-(--text-faint)">
                     {subgroup.label}
                   </h3>
-                  <div className="grid grid-cols-12 gap-1.5 max-lg:grid-cols-10 max-md:grid-cols-8 max-sm:grid-cols-6">
+                  <div className="grid grid-cols-16 gap-1.5 max-lg:grid-cols-14 max-md:grid-cols-12 max-sm:grid-cols-10">
                     {subgroup.emojis.map((option) => (
                       <button
                         key={option.emoji}
@@ -159,10 +161,10 @@ export function SoundEditor({ disabled, sound, onClose, onSave }: SoundEditorPro
 
         <footer className="mt-1 flex shrink-0 justify-end gap-2">
           <Button variant="secondary" onClick={onClose}>
-            Cancelar
+            {t("editor.cancel")}
           </Button>
           <Button disabled={disabled} type="submit">
-            Salvar
+            {t("editor.save")}
           </Button>
         </footer>
       </form>

@@ -1,5 +1,6 @@
 import { Music, Plus, Search } from "lucide-react";
 import { Button, Card, IconTile } from "./ui";
+import { useI18n } from "../../i18n";
 
 interface EmptyStateProps {
   disabled?: boolean;
@@ -9,6 +10,7 @@ interface EmptyStateProps {
 }
 
 export function EmptyState({ disabled = false, query = "", type, onAddSounds }: EmptyStateProps) {
+  const { t } = useI18n();
   const isSearch = type === "search";
 
   return (
@@ -20,19 +22,16 @@ export function EmptyState({ disabled = false, query = "", type, onAddSounds }: 
         {isSearch ? <Search size={24} /> : <Music size={24} />}
       </IconTile>
       <h2 className="mt-1.5 text-lg font-semibold text-(--text-h)">
-        {isSearch ? "Nada encontrado" : "A sua biblioteca está vazia"}
+        {isSearch ? t("empty.searchTitle") : t("empty.libraryTitle")}
       </h2>
       {isSearch ? (
-        <p className="max-w-105 leading-normal">Nenhum áudio corresponde a “{query}”.</p>
+        <p className="max-w-105 leading-normal">{t("empty.searchBody", { query })}</p>
       ) : (
         <>
-          <p className="max-w-105 leading-normal">
-            Adicione ficheiros de áudio com “Adicionar”. Eles são guardados na pasta de dados do
-            utilizador e persistem entre atualizações.
-          </p>
+          <p className="max-w-105 leading-normal">{t("empty.libraryBody")}</p>
           <Button className="mt-2" variant="primary" onClick={onAddSounds} disabled={disabled}>
             <Plus size={16} aria-hidden="true" />
-            Adicionar áudios
+            {t("empty.addSounds")}
           </Button>
         </>
       )}

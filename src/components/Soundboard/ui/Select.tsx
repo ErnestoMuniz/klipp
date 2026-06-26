@@ -69,11 +69,13 @@ export function Select({
 
   const close = useCallback(() => setOpen(false), []);
 
-  // Position the floating menu whenever it opens.
+  // Position the floating menu whenever it opens. The menu is rendered
+  // (invisibly) before it has a position so we can measure its real height —
+  // that lets short menus open upward without leaving a gap above the trigger.
   useLayoutEffect(() => {
-    if (!open || !triggerRef.current) return;
+    if (!open || !triggerRef.current || !menuRef.current) return;
     const rect = triggerRef.current.getBoundingClientRect();
-    const menuHeight = 224; // matches max-h-56 (~14rem)
+    const menuHeight = Math.min(menuRef.current.offsetHeight, 224);
     const openUp = rect.bottom + menuHeight > window.innerHeight && rect.top - menuHeight > 8;
     setPosition({
       left: rect.left,
@@ -81,7 +83,7 @@ export function Select({
       width: rect.width,
       openUp,
     });
-  }, [open]);
+  }, [open, options.length]);
 
   // Reset highlight when opening, and clamp it while navigating.
   useEffect(() => {
@@ -226,16 +228,18 @@ export function Select({
       </button>
 
       {open &&
-        position &&
         createPortal(
           <div
             ref={menuRef}
-            className="z-50 max-h-56 overflow-y-auto rounded-md border border-(--border) bg-(--surface) py-0 mt-1 shadow-(--shadow-lg) outline-none"
+            className={cx(
+              "z-50 max-h-56 overflow-y-auto rounded-md border border-(--border) bg-(--surface) py-0 mt-1 shadow-(--shadow-lg) outline-none",
+              !position && "invisible pointer-events-none",
+            )}
             style={{
               position: "fixed",
-              left: position.left,
-              top: position.top,
-              width: position.width,
+              left: position?.left ?? 0,
+              top: position?.top ?? 0,
+              width: position?.width ?? triggerRef.current?.offsetWidth ?? undefined,
             }}
             role="listbox"
             aria-labelledby={`${listId}-label`}

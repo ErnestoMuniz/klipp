@@ -1,5 +1,6 @@
 import { AlertCircle } from "lucide-react";
 import { Button, Card } from "./ui";
+import { useI18n } from "../../i18n";
 
 interface ErrorBannerProps {
   disabled: boolean;
@@ -8,6 +9,7 @@ interface ErrorBannerProps {
 }
 
 export function ErrorBanner({ disabled, error, onRetry }: ErrorBannerProps) {
+  const { t } = useI18n();
   return (
     <Card
       tone="alert"
@@ -17,10 +19,10 @@ export function ErrorBanner({ disabled, error, onRetry }: ErrorBannerProps) {
         <AlertCircle size={13} />
       </span>
       <span className="min-w-50 flex-1">
-        <strong>Erro:</strong> {error}
+        <strong>{t("error.prefix")}</strong> {error}
       </span>
       <Button variant="secondary" onClick={onRetry} disabled={disabled}>
-        Tentar novamente
+        {t("error.retry")}
       </Button>
     </Card>
   );

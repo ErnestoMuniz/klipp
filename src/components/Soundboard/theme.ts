@@ -35,10 +35,3 @@ export function resolveTheme(theme: Theme): "light" | "dark" {
   }
   return theme;
 }
-
-/** Human-readable labels for theme options */
-export const themeLabels: Record<Theme, string> = {
-  light: "Claro",
-  dark: "Escuro",
-  system: "Sistema",
-};

@@ -15,8 +15,10 @@ import { cx } from "./styles";
 import { PREFS_KEY, emptyState, loadPrefs, soundLabel } from "./types";
 import type { Prefs, Status, Theme } from "./types";
 import { applyTheme } from "./theme";
+import { useI18n } from "../../i18n";
 
 function Soundboard() {
+  const { t } = useI18n();
   const [state, setState] = useState<AudioState | null>(null);
   const [status, setStatus] = useState<Status>("idle");
   const [playing, setPlaying] = useState<string | null>(null);
@@ -66,7 +68,7 @@ function Soundboard() {
 
   useEffect(() => {
     if (!api) {
-      setFatal("A API de áudio não está disponível (preload não carregou). Reinicie o app.");
+      setFatal(t("app.fatalAudio"));
       return;
     }
     void api
@@ -78,7 +80,9 @@ function Soundboard() {
           error: error instanceof Error ? error.message : String(error),
         })),
       );
-  }, [api]);
+    // `t` is needed when api is missing so the fatal message matches the
+    // active locale, but it otherwise only re-runs when api changes.
+  }, [api, t]);
 
   useEffect(() => {
     if (audioRef.current) audioRef.current.volume = muted ? 0 : volume;
@@ -342,8 +346,8 @@ function Soundboard() {
         className="fixed right-6 bottom-28 z-10 size-14 gap-0 rounded-full! p-0 shadow-[var(--shadow-lg),var(--inset-hi)] max-sm:bottom-28"
         onClick={() => void onAddSounds()}
         disabled={disabled}
-        aria-label="Adicionar áudios"
-        title="Adicionar áudios"
+        aria-label={t("app.addSoundsAria")}
+        title={t("app.addSoundsTitle")}
       >
         <Plus size={26} aria-hidden="true" />
       </Button>

@@ -5,6 +5,7 @@ import { Equalizer } from "./Equalizer";
 import { Edit3, Star, StarOff } from "lucide-react";
 import { emojiFontFamily } from "./emojiFont";
 import { soundLabel } from "./types";
+import { useI18n } from "../../i18n";
 
 interface SoundPadProps {
   density: Density;
@@ -23,6 +24,7 @@ export function SoundPad({
   onPlay,
   onToggleOverlay,
 }: SoundPadProps) {
+  const { t } = useI18n();
   const label = soundLabel(sound);
 
   return (
@@ -48,7 +50,7 @@ export function SoundPad({
           )}
           role="button"
           tabIndex={0}
-          title={sound.inOverlay ? "Remover do seletor rápido" : "Adicionar ao seletor rápido"}
+          title={sound.inOverlay ? t("pad.removeFromPicker") : t("pad.addToPicker")}
           aria-pressed={sound.inOverlay}
           onClick={(event) => {
             event.stopPropagation();
@@ -67,7 +69,7 @@ export function SoundPad({
           className="grid size-8 cursor-pointer place-items-center rounded-sm border border-(--border) bg-(--surface-sunk) text-(--text-faint) shadow-(--inset-lo) transition hover:border-(--accent-border) hover:text-(--accent)"
           role="button"
           tabIndex={0}
-          title="Editar áudio"
+          title={t("pad.edit")}
           onClick={(event) => {
             event.stopPropagation();
             onEdit(sound);
@@ -122,7 +124,7 @@ export function SoundPad({
         )}
         aria-hidden="true"
       >
-        {isPlaying ? "A tocar" : "Tocar"}
+        {isPlaying ? t("pad.playing") : t("pad.play")}
       </span>
     </button>
   );

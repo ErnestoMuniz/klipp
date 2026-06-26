@@ -2,6 +2,7 @@ import { LayoutGrid, Lightbulb, Music, Rows3, Search, Settings, Star, X } from "
 import type { Density, Prefs, SortMode } from "./types";
 import { cx } from "./styles";
 import { Badge, Button, IconTile, Select } from "./ui";
+import { useI18n } from "../../i18n";
 
 interface LibraryToolbarProps {
   density: Density;
@@ -26,6 +27,8 @@ export function LibraryToolbar({
   onQueryChange,
   onSettingsToggle,
 }: LibraryToolbarProps) {
+  const { t } = useI18n();
+
   return (
     <div className="flex flex-wrap items-center justify-between gap-3 px-0.5 pb-0.5 pt-1.5">
       <div className="inline-flex items-center gap-3 text-sm font-semibold text-(--text-h)">
@@ -33,7 +36,7 @@ export function LibraryToolbar({
           <Music size={13} />
         </IconTile>
         <span className="font-mono text-xs font-semibold uppercase tracking-widest text-(--text)">
-          Biblioteca
+          {t("toolbar.library")}
         </span>
         <Badge>
           {visibleCount}
@@ -49,10 +52,10 @@ export function LibraryToolbar({
           <input
             type="search"
             className="min-w-0 flex-1 border-0 bg-transparent text-sm text-(--text-h) outline-none placeholder:text-(--text-faint) appearance-none [&::-webkit-search-cancel-button]:appearance-none"
-            placeholder="Pesquisar áudios…"
+            placeholder={t("toolbar.searchPlaceholder")}
             value={query}
             onChange={(event) => onQueryChange(event.target.value)}
-            aria-label="Pesquisar áudios"
+            aria-label={t("toolbar.searchAria")}
           />
           {query && (
             <Button
@@ -60,7 +63,7 @@ export function LibraryToolbar({
               size="sm"
               className="size-6 rounded-full border-0 bg-(--border) shadow-none hover:bg-(--accent) hover:text-(--accent-ink)"
               onClick={() => onQueryChange("")}
-              aria-label="Limpar pesquisa"
+              aria-label={t("toolbar.clearSearch")}
             >
               <X size={11} />
             </Button>
@@ -70,18 +73,18 @@ export function LibraryToolbar({
         <div
           className="hidden gap-1 rounded-md border border-(--border) bg-(--surface-sunk) p-1 shadow-(--inset-lo) sm:inline-flex"
           role="group"
-          aria-label="Densidade da grelha"
+          aria-label={t("toolbar.densityAria")}
         >
           <DensityButton
             active={density === "comfort"}
-            title="Vista confortável"
+            title={t("toolbar.densityComfort")}
             onClick={() => onPrefsChange((current) => ({ ...current, density: "comfort" }))}
           >
             <LayoutGrid size={14} />
           </DensityButton>
           <DensityButton
             active={density === "compact"}
-            title="Vista compacta"
+            title={t("toolbar.densityCompact")}
             onClick={() => onPrefsChange((current) => ({ ...current, density: "compact" }))}
           >
             <Rows3 size={14} />
@@ -90,15 +93,15 @@ export function LibraryToolbar({
 
         <Select
           className="py-2 text-sm font-medium"
-          label="Ordenar"
+          label={t("toolbar.sortLabel")}
           value={prefs.sort}
           onChange={(event) =>
             onPrefsChange((current) => ({ ...current, sort: event.target.value as SortMode }))
           }
         >
-          <option value="name-asc">Nome (A-Z)</option>
-          <option value="name-desc">Nome (Z-A)</option>
-          <option value="recent">Recentes</option>
+          <option value="name-asc">{t("toolbar.sortNameAsc")}</option>
+          <option value="name-desc">{t("toolbar.sortNameDesc")}</option>
+          <option value="recent">{t("toolbar.sortRecent")}</option>
         </Select>
 
         <Button
@@ -108,8 +111,8 @@ export function LibraryToolbar({
             onPrefsChange((current) => ({ ...current, onlyOverlay: !current.onlyOverlay }))
           }
           aria-pressed={prefs.onlyOverlay}
-          aria-label="Só do seletor"
-          title="Mostrar apenas os áudios do seletor rápido"
+          aria-label={t("toolbar.overlayOnlyAria")}
+          title={t("toolbar.overlayOnlyTitle")}
         >
           <Star size={18} aria-hidden="true" />
         </Button>
@@ -121,8 +124,8 @@ export function LibraryToolbar({
             onPrefsChange((current) => ({ ...current, showHints: !current.showHints }))
           }
           aria-pressed={prefs.showHints}
-          aria-label={prefs.showHints ? "Ocultar dicas" : "Mostrar dicas"}
-          title={prefs.showHints ? "Ocultar dicas" : "Mostrar dicas"}
+          aria-label={prefs.showHints ? t("toolbar.hideHints") : t("toolbar.showHints")}
+          title={prefs.showHints ? t("toolbar.hideHints") : t("toolbar.showHints")}
         >
           <Lightbulb size={18} aria-hidden="true" />
         </Button>
@@ -133,8 +136,8 @@ export function LibraryToolbar({
           className="size-10 p-0"
           onClick={onSettingsToggle}
           aria-expanded={settingsOpen}
-          aria-label="Definições"
-          title="Definições"
+          aria-label={t("toolbar.settingsAria")}
+          title={t("toolbar.settingsAria")}
         >
           <Settings size={20} />
         </Button>

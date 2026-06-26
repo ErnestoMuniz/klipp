@@ -1,10 +1,11 @@
-import { Moon, Sun, SunMoon, X } from "lucide-react";
+import { Globe, Moon, Sun, SunMoon, X } from "lucide-react";
 import type { AudioState } from "../../audio-globals";
 import { GLOBAL_SHORTCUT } from "./types";
 import type { Theme } from "./types";
 import { cx, dividerClass } from "./styles";
 import { Button, FieldGroup, Select, Switch } from "./ui";
-import { themeLabels } from "./theme";
+import { useI18n } from "../../i18n";
+import type { LanguagePref } from "../../i18n";
 
 interface SettingsDrawerProps {
   disabled: boolean;
@@ -29,6 +30,20 @@ export function SettingsDrawer({
   onMicSource,
   onThemeChange,
 }: SettingsDrawerProps) {
+  const { t, language, setLanguage } = useI18n();
+
+  const themeLabels: Record<Theme, string> = {
+    light: t("settings.themeLight"),
+    dark: t("settings.themeDark"),
+    system: t("settings.themeSystem"),
+  };
+
+  const languageOptions: { value: LanguagePref; label: string }[] = [
+    { value: "system", label: t("settings.languageSystem") },
+    { value: "en", label: t("settings.languageEn") },
+    { value: "pt-BR", label: t("settings.languagePtBR") },
+  ];
+
   return (
     <>
       <div
@@ -45,32 +60,30 @@ export function SettingsDrawer({
           open ? "translate-x-0" : "translate-x-full",
         )}
         aria-hidden={!open}
-        aria-label="Definições"
+        aria-label={t("settings.title")}
       >
         <div className="flex items-center justify-between border-b border-(--border) bg-[linear-gradient(180deg,var(--surface-raise),var(--surface))] px-5 pb-2 pt-2 shadow-(--inset-hi)">
-          <span className="text-lg font-semibold text-(--text-h)">Definições</span>
-          <Button variant="ghost" onClick={onClose} aria-label="Fechar definições">
+          <span className="text-lg font-semibold text-(--text-h)">{t("settings.title")}</span>
+          <Button variant="ghost" onClick={onClose} aria-label={t("settings.closeAria")}>
             <X size={22} />
           </Button>
         </div>
 
         <div className="flex flex-col gap-5 overflow-y-auto p-5">
-          <FieldGroup label="Microfone real (pass-through)">
+          <FieldGroup label={t("settings.micPassthroughGroup")}>
             <Switch
               checked={state.micPassthrough}
               disabled={disabled || state.micSources.length === 0}
-              label="Passar o meu microfone junto com os áudios"
+              label={t("settings.micPassthroughLabel")}
               onChange={(event) => onMicPassthrough(event.target.checked)}
             />
             <Select
-              label="Microfone"
+              label={t("settings.micLabel")}
               value={state.currentMicSource ?? ""}
               onChange={(event) => onMicSource(event.target.value)}
               disabled={disabled || state.micSources.length === 0}
             >
-              {state.micSources.length === 0 && (
-                <option value="">Nenhum microfone encontrado</option>
-              )}
+              {state.micSources.length === 0 && <option value="">{t("settings.micNone")}</option>}
               {state.micSources.map((mic) => (
                 <option key={mic.name} value={mic.name}>
                   {mic.description}
@@ -81,18 +94,18 @@ export function SettingsDrawer({
 
           <div className={dividerClass} />
 
-          <FieldGroup label="Monitorização">
+          <FieldGroup label={t("settings.monitoringGroup")}>
             <Switch
               checked={state.hearClips}
               disabled={disabled}
-              label="Ouvir os áudios nos meus fones/caixas (só os áudios, sem a minha voz)"
+              label={t("settings.hearClipsLabel")}
               onChange={(event) => onHearClips(event.target.checked)}
             />
           </FieldGroup>
 
           <div className={dividerClass} />
 
-          <FieldGroup label="Tema">
+          <FieldGroup label={t("settings.themeGroup")}>
             <div className="flex gap-2">
               {(["light", "dark", "system"] as const).map((value) => (
                 <button
@@ -117,15 +130,38 @@ export function SettingsDrawer({
             </div>
           </FieldGroup>
 
+          <FieldGroup label={t("settings.languageGroup")}>
+            <div className="inline-flex items-center gap-2">
+              <Globe size={16} className="text-(--text-faint)" aria-hidden="true" />
+              <Select
+                label={t("settings.languageGroup")}
+                value={language}
+                onChange={(event) => setLanguage(event.target.value as LanguagePref)}
+              >
+                {languageOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </Select>
+            </div>
+          </FieldGroup>
+
+          <div className={dividerClass} />
+
           <div className="flex flex-col gap-2">
-            <FieldGroup label="Dispositivo no Discord">
+            <FieldGroup label={t("settings.discordGroup")}>
               <p className="text-sm leading-normal text-(--text)">
-                Defina o <strong className="text-(--text-h)">dispositivo de entrada</strong> como{" "}
-                <code className="text-xs">{state.discordDeviceName}</code>.
+                {t("settings.discordIntro")}{" "}
+                <strong className="text-(--text-h)">{t("settings.discordInputDevice")}</strong>{" "}
+                {t("settings.discordTo")} <code className="text-xs">{state.discordDeviceName}</code>
+                .
               </p>
               <p className="text-sm leading-normal text-(--text)">
-                Atalho global <code className="text-xs">{GLOBAL_SHORTCUT}</code> abre o seletor
-                rápido · <code className="text-xs">Esc</code> fecha.
+                {t("settings.globalShortcutHint", {
+                  shortcut: GLOBAL_SHORTCUT,
+                  esc: "Esc",
+                })}
               </p>
             </FieldGroup>
           </div>

@@ -3,6 +3,7 @@ import type { CSSProperties } from "react";
 import type { SoundFile } from "../../audio-globals";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { emojiFontFamily } from "../Soundboard/emojiFont";
+import { useI18n } from "../../i18n";
 
 const PAGE_SIZE = 8;
 const MENU_RADIUS = 230;
@@ -53,6 +54,7 @@ function pieSlicePath(startAngle: number, endAngle: number): string {
 }
 
 function Overlay() {
+  const { t } = useI18n();
   const [active, setActive] = useState(false);
   const [sounds, setSounds] = useState<SoundFile[]>([]);
   const [page, setPage] = useState(0);
@@ -188,7 +190,7 @@ function Overlay() {
   return (
     <main
       className={`overlay-shell${active ? " is-active" : ""}${position ? " is-positioned" : ""}`}
-      aria-label="Seletor rápido de áudios"
+      aria-label={t("overlay.aria")}
       onPointerEnter={capturePointer}
       onPointerMove={capturePointer}
       onPointerDown={closeOutside}
@@ -204,7 +206,7 @@ function Overlay() {
               className="overlay-pie"
               viewBox="0 0 460 460"
               role="group"
-              aria-label="Áudios disponíveis"
+              aria-label={t("overlay.soundsAria")}
             >
               {visibleSounds.map((sound, index) => {
                 const sliceAngle = (Math.PI * 2) / Math.max(visibleSounds.length, 1);
@@ -223,7 +225,7 @@ function Overlay() {
                     className={`overlay-slice${isPlaying ? " is-playing" : ""}`}
                     role="button"
                     tabIndex={0}
-                    aria-label={`Tocar ${soundLabel(sound)}`}
+                    aria-label={t("overlay.playAria", { label: soundLabel(sound) })}
                     onPointerEnter={() => {
                       hoveredSoundRef.current = sound;
                     }}
@@ -270,24 +272,32 @@ function Overlay() {
 
             <div className="overlay-center">
               <span className={`overlay-kicker${playing ? " is-live" : ""}`}>
-                {playing ? "A tocar" : "Soundboard"}
+                {playing ? t("overlay.playing") : t("overlay.soundboard")}
               </span>
               {sounds.length === 0 ? (
-                <strong>Sem áudios</strong>
+                <strong>{t("overlay.noSounds")}</strong>
               ) : playingSound ? (
                 <strong title={soundLabel(playingSound)}>{soundLabel(playingSound)}</strong>
               ) : (
-                <strong>Escolha um som</strong>
+                <strong>{t("overlay.pick")}</strong>
               )}
               {pageCount > 1 && (
                 <div className="overlay-pages">
-                  <button type="button" aria-label="Página anterior" onClick={() => changePage(-1)}>
+                  <button
+                    type="button"
+                    aria-label={t("overlay.prevPage")}
+                    onClick={() => changePage(-1)}
+                  >
                     <ChevronLeft size={14} />
                   </button>
                   <span>
                     {page + 1}/{pageCount}
                   </span>
-                  <button type="button" aria-label="Próxima página" onClick={() => changePage(1)}>
+                  <button
+                    type="button"
+                    aria-label={t("overlay.nextPage")}
+                    onClick={() => changePage(1)}
+                  >
                     <ChevronRight size={14} />
                   </button>
                 </div>
