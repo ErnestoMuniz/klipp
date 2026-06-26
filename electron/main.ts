@@ -441,6 +441,9 @@ ipcMain.on("window:close", () => {
   win.close();
 });
 
+// Set app name early so Linux window managers can match the .desktop file icon
+app.setName("klipp");
+
 void app.whenReady().then(async () => {
   // No application menu, no visible menu bar — the UI owns all chrome.
   Menu.setApplicationMenu(null);
