@@ -8,11 +8,15 @@ export interface SoundFile {
   displayName: string;
   name: string;
   url: string;
+  /** Whether this sound is selectable in the quick overlay picker. */
+  inOverlay: boolean;
 }
 
 export interface SoundMetadata {
-  emoji: string;
-  displayName: string;
+  emoji?: string;
+  displayName?: string;
+  /** New value for the overlay-availability flag (preserved when omitted). */
+  inOverlay?: boolean;
 }
 
 export interface AudioState {

@@ -1,4 +1,4 @@
-import { LayoutGrid, Music, Plus, Rows3 } from "lucide-react";
+import { LayoutGrid, Music, Plus, Rows3, Star } from "lucide-react";
 import type { Density, Prefs, SortMode } from "./types";
 import { cx } from "./styles";
 import { Badge, Button, IconTile, Select } from "./ui";
@@ -73,6 +73,22 @@ export function LibraryToolbar({
           <option value="name-desc">Nome (Z-A)</option>
           <option value="recent">Recentes</option>
         </Select>
+
+        <Button
+          variant="ghost"
+          className={cx("inline-flex items-center gap-1.5", prefs.onlyOverlay && "text-(--accent)")}
+          onClick={() =>
+            onPrefsChange((current) => ({ ...current, onlyOverlay: !current.onlyOverlay }))
+          }
+          aria-pressed={prefs.onlyOverlay}
+          title="Mostrar apenas os áudios do seletor rápido"
+        >
+          <Star size={15} aria-hidden="true" />
+          <span className="hidden sm:inline">Só do seletor</span>
+          <span className="sm:hidden" aria-hidden="true">
+            Seletor
+          </span>
+        </Button>
 
         <Button
           variant="ghost"

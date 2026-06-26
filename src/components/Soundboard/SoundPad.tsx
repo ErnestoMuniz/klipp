@@ -2,7 +2,7 @@ import type { SoundFile } from "../../audio-globals";
 import type { Density } from "./types";
 import { cx } from "./styles";
 import { Equalizer } from "./Equalizer";
-import { Edit3 } from "lucide-react";
+import { Edit3, Star, StarOff } from "lucide-react";
 import { emojiFontFamily } from "./emojiFont";
 import { soundLabel } from "./types";
 
@@ -12,9 +12,17 @@ interface SoundPadProps {
   sound: SoundFile;
   onEdit: (sound: SoundFile) => void;
   onPlay: (url: string) => void;
+  onToggleOverlay: (sound: SoundFile) => void;
 }
 
-export function SoundPad({ density, isPlaying, sound, onEdit, onPlay }: SoundPadProps) {
+export function SoundPad({
+  density,
+  isPlaying,
+  sound,
+  onEdit,
+  onPlay,
+  onToggleOverlay,
+}: SoundPadProps) {
   const label = soundLabel(sound);
 
   return (
@@ -27,27 +35,52 @@ export function SoundPad({ density, isPlaying, sound, onEdit, onPlay }: SoundPad
           : "flex-row items-center gap-2.5 rounded-xl p-2.5",
         isPlaying &&
           "border-(--accent) bg-[linear-gradient(180deg,var(--accent-bg-strong),var(--accent-bg))] shadow-[0_0_0_3px_var(--accent-bg),0_8px_24px_-12px_var(--accent-glow),var(--inset-hi)] after:opacity-0",
+        !sound.inOverlay && "opacity-50 grayscale",
       )}
       onClick={() => onPlay(sound.url)}
       title={label}
     >
-      <span
-        className="absolute right-2 top-2 z-1 grid size-8 place-items-center rounded-sm border border-(--border) bg-(--surface-sunk) text-(--text-faint) opacity-0 shadow-(--inset-lo) transition hover:border-(--accent-border) hover:text-(--accent) group-hover:opacity-100 focus-visible:opacity-100"
-        role="button"
-        tabIndex={0}
-        title="Editar áudio"
-        onClick={(event) => {
-          event.stopPropagation();
-          onEdit(sound);
-        }}
-        onKeyDown={(event) => {
-          if (event.key !== "Enter" && event.key !== " ") return;
-          event.preventDefault();
-          event.stopPropagation();
-          onEdit(sound);
-        }}
-      >
-        <Edit3 size={15} />
+      <span className="absolute right-2 top-2 z-1 inline-flex gap-1 opacity-0 transition group-hover:opacity-100 group-focus-within:opacity-100">
+        <span
+          className={cx(
+            "grid size-8 cursor-pointer place-items-center rounded-sm border border-(--border) bg-(--surface-sunk) shadow-(--inset-lo) transition hover:border-(--accent-border)",
+            sound.inOverlay ? "text-(--accent)" : "text-(--text-faint)",
+          )}
+          role="button"
+          tabIndex={0}
+          title={sound.inOverlay ? "Remover do seletor rápido" : "Adicionar ao seletor rápido"}
+          aria-pressed={sound.inOverlay}
+          onClick={(event) => {
+            event.stopPropagation();
+            onToggleOverlay(sound);
+          }}
+          onKeyDown={(event) => {
+            if (event.key !== "Enter" && event.key !== " ") return;
+            event.preventDefault();
+            event.stopPropagation();
+            onToggleOverlay(sound);
+          }}
+        >
+          {sound.inOverlay ? <Star size={15} /> : <StarOff size={15} />}
+        </span>
+        <span
+          className="grid size-8 cursor-pointer place-items-center rounded-sm border border-(--border) bg-(--surface-sunk) text-(--text-faint) shadow-(--inset-lo) transition hover:border-(--accent-border) hover:text-(--accent)"
+          role="button"
+          tabIndex={0}
+          title="Editar áudio"
+          onClick={(event) => {
+            event.stopPropagation();
+            onEdit(sound);
+          }}
+          onKeyDown={(event) => {
+            if (event.key !== "Enter" && event.key !== " ") return;
+            event.preventDefault();
+            event.stopPropagation();
+            onEdit(sound);
+          }}
+        >
+          <Edit3 size={15} />
+        </span>
       </span>
       <span
         className={cx(
@@ -76,6 +109,7 @@ export function SoundPad({ density, isPlaying, sound, onEdit, onPlay }: SoundPad
         className={cx(
           "min-w-0 wrap-break-word text-sm font-medium leading-tight text-(--text-h) [display:-webkit-box] [-webkit-box-orient:vertical] overflow-hidden",
           density === "comfort" ? "line-clamp-2 shrink-0" : "flex-1 [-webkit-line-clamp:1]",
+          !sound.inOverlay && "text-(--text-faint) font-normal",
         )}
       >
         {label}

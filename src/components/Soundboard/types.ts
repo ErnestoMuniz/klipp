@@ -4,6 +4,8 @@ import type { SoundFile } from "../../audio-globals";
 export type Status = "idle" | "busy";
 export type Density = "comfort" | "compact";
 export type SortMode = "name-asc" | "name-desc" | "recent";
+/** Library-level view filter. "overlay" filters to sounds in the quick picker. */
+export type ViewFilter = "all" | "overlay";
 
 export const GLOBAL_SHORTCUT = "Alt+Shift+S";
 export const PREFS_KEY = "klipp.prefs.v1";
@@ -14,6 +16,8 @@ export interface Prefs {
   showHints: boolean;
   volume: number;
   muted: boolean;
+  /** Library-only filter that hides sounds not added to the overlay picker. */
+  onlyOverlay: boolean;
 }
 
 export const defaultPrefs: Prefs = {
@@ -22,6 +26,7 @@ export const defaultPrefs: Prefs = {
   showHints: true,
   volume: 1,
   muted: false,
+  onlyOverlay: false,
 };
 
 export const emptyState: AudioState = {

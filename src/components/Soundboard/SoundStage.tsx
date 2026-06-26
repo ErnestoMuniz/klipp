@@ -14,6 +14,7 @@ interface SoundStageProps {
   onAddSounds: () => void;
   onEdit: (sound: SoundFile) => void;
   onPlay: (url: string) => void;
+  onToggleOverlay: (sound: SoundFile) => void;
 }
 
 export function SoundStage({
@@ -26,6 +27,7 @@ export function SoundStage({
   onAddSounds,
   onEdit,
   onPlay,
+  onToggleOverlay,
 }: SoundStageProps) {
   if (totalSounds === 0) {
     return (
@@ -61,6 +63,7 @@ export function SoundStage({
             sound={sound}
             onEdit={onEdit}
             onPlay={onPlay}
+            onToggleOverlay={onToggleOverlay}
           />
         ))}
       </div>

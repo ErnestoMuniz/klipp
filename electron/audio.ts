@@ -47,6 +47,8 @@ async function saveSettings(settings: StoredSettings): Promise<void> {
 export interface SoundMetadata {
   emoji: string;
   displayName: string;
+  /** When provided, updates the overlay-availability flag. */
+  inOverlay?: boolean;
 }
 
 type StoredSoundMetadata = Record<string, Partial<SoundMetadata>>;
@@ -97,6 +99,8 @@ export interface SoundFile {
   displayName: string;
   name: string;
   url: string;
+  /** Whether this sound is selectable from the quick overlay picker. */
+  inOverlay: boolean;
 }
 
 export interface AudioState {
@@ -391,7 +395,8 @@ export class AudioManager {
             typeof metadata.emoji === "string" && metadata.emoji.trim()
               ? metadata.emoji.trim()
               : "♪";
-          return { emoji, displayName, name, url };
+          const inOverlay = metadata.inOverlay !== false;
+          return { emoji, displayName, name, url, inOverlay };
         });
     } catch {
       return [];
@@ -407,12 +412,15 @@ export class AudioManager {
     const sound = this.sounds.find((candidate) => candidate.url === url);
     if (!sound) return this.getState();
 
-    const displayName =
-      metadata.displayName.trim() || path.basename(sound.name, path.extname(sound.name));
-    const emoji = metadata.emoji.trim() || "♪";
+    const newDisplayName =
+      typeof metadata.displayName === "string" ? metadata.displayName.trim() : "";
+    const newEmoji = typeof metadata.emoji === "string" ? metadata.emoji.trim() : "";
+    const displayName = newDisplayName || sound.displayName;
+    const emoji = newEmoji || sound.emoji;
+    const inOverlay = metadata.inOverlay ?? sound.inOverlay;
     this.soundMetadata = {
       ...this.soundMetadata,
-      [url]: { displayName, emoji },
+      [url]: { displayName, emoji, inOverlay },
     };
     await saveSoundMetadata(this.soundMetadata);
     this.sounds = await this.listSounds();
@@ -435,6 +443,11 @@ export class AudioManager {
     }
     this.sounds = await this.listSounds();
     return this.getState();
+  }
+
+  /** Sounds the quick overlay picker may show (those opted into the overlay). */
+  overlaySounds(): SoundFile[] {
+    return this.sounds.filter((sound) => sound.inOverlay);
   }
 
   async cleanup(): Promise<void> {

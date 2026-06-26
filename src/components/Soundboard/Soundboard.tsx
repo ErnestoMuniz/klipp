@@ -143,6 +143,14 @@ function Soundboard() {
     }
   }
 
+  async function onToggleOverlay(sound: SoundFile) {
+    if (!api) return;
+    const next = await run(() =>
+      api.updateSoundMetadata(sound.url, { inOverlay: !sound.inOverlay }),
+    );
+    if (next) setState(next);
+  }
+
   function play(url: string) {
     const previous = audioRef.current;
     if (previous) {
@@ -188,11 +196,14 @@ function Soundboard() {
   const soundboardState = state ?? emptyState;
   const filtered = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
-    const list = normalizedQuery
+    let list = normalizedQuery
       ? soundboardState.sounds.filter((sound) =>
           soundLabel(sound).toLowerCase().includes(normalizedQuery),
         )
       : soundboardState.sounds;
+    if (prefs.onlyOverlay) {
+      list = list.filter((sound) => sound.inOverlay);
+    }
     const sorted = [...list];
     switch (prefs.sort) {
       case "name-desc":
@@ -205,7 +216,7 @@ function Soundboard() {
         sorted.sort((a, b) => soundLabel(a).localeCompare(soundLabel(b)));
     }
     return sorted;
-  }, [soundboardState.sounds, query, prefs.sort]);
+  }, [soundboardState.sounds, query, prefs.sort, prefs.onlyOverlay]);
 
   if (fatal) {
     return (
@@ -277,6 +288,7 @@ function Soundboard() {
         onAddSounds={() => void onAddSounds()}
         onEdit={setEditingSound}
         onPlay={play}
+        onToggleOverlay={(sound) => void onToggleOverlay(sound)}
       />
 
       <SoundEditor

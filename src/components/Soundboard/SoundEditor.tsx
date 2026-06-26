@@ -3,7 +3,7 @@ import { X } from "lucide-react";
 import type { SoundFile, SoundMetadata } from "../../audio-globals";
 import { EMOJI_GROUPS } from "./emojiData";
 import { emojiFontFamily } from "./emojiFont";
-import { Button } from "./ui";
+import { Button, FieldGroup, Switch } from "./ui";
 import { soundLabel } from "./types";
 import { cx } from "./styles";
 
@@ -36,12 +36,14 @@ interface SoundEditorProps {
 export function SoundEditor({ disabled, sound, onClose, onSave }: SoundEditorProps) {
   const [displayName, setDisplayName] = useState("");
   const [emoji, setEmoji] = useState("♪");
+  const [inOverlay, setInOverlay] = useState(true);
   const [activeGroup, setActiveGroup] = useState<EmojiGroupLabel>(DEFAULT_EMOJI_GROUP);
 
   useEffect(() => {
     if (!sound) return;
     setDisplayName(soundLabel(sound));
     setEmoji(sound.emoji || "♪");
+    setInOverlay(sound.inOverlay !== false);
   }, [sound]);
 
   if (!sound) return null;
@@ -60,7 +62,11 @@ export function SoundEditor({ disabled, sound, onClose, onSave }: SoundEditorPro
         className="flex h-[min(820px,calc(100svh-32px))] w-full max-w-4xl flex-col gap-5 overflow-hidden rounded-lg border border-(--border-strong) bg-(--surface) p-5 text-(--text-h) shadow-(--shadow) max-sm:h-[calc(100svh-20px)] max-sm:p-4"
         onSubmit={(event) => {
           event.preventDefault();
-          onSave(sound, { displayName, emoji: firstGrapheme(emoji) || "♪" });
+          onSave(sound, {
+            displayName,
+            emoji: firstGrapheme(emoji) || "♪",
+            inOverlay,
+          });
         }}
       >
         <header className="flex items-center justify-between gap-4">
@@ -72,6 +78,15 @@ export function SoundEditor({ disabled, sound, onClose, onSave }: SoundEditorPro
             <X size={22} />
           </Button>
         </header>
+
+        <FieldGroup label="No seletor rápido (overlay)">
+          <Switch
+            checked={inOverlay}
+            disabled={disabled}
+            label="Disponível no seletor rápido (atalho Alt+Shift+S)"
+            onChange={(event) => setInOverlay(event.target.checked)}
+          />
+        </FieldGroup>
 
         <label className="flex flex-col gap-2 text-sm font-medium text-(--text-h)">
           Nome

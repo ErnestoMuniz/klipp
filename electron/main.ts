@@ -199,7 +199,7 @@ function createOverlay(display: Display): OverlayView {
     overlayWindow.setSkipTaskbar(true);
 
     if (overlayActive) {
-      overlayWindow.webContents.send("overlay:show", audio.getState().sounds);
+      overlayWindow.webContents.send("overlay:show", audio.overlaySounds());
       overlayWindow.setFocusable(true);
       overlayWindow.setIgnoreMouseEvents(false);
     } else {
@@ -244,7 +244,7 @@ function showOverlay(): void {
   for (const view of overlays.values()) {
     if (view.window.isDestroyed()) continue;
     if (view.rendererReady) {
-      view.window.webContents.send("overlay:show", audio.getState().sounds);
+      view.window.webContents.send("overlay:show", audio.overlaySounds());
     }
     view.window.setSkipTaskbar(true);
     view.window.setFocusable(true);
