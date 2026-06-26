@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties } from "react";
 import type { SoundFile } from "../../audio-globals";
 import { ChevronLeft, ChevronRight } from "lucide-react";
+import { emojiFontFamily } from "../Soundboard/emojiFont";
 
 const PAGE_SIZE = 8;
 const MENU_RADIUS = 230;
@@ -19,8 +20,12 @@ function labelFor(name: string): string {
   return name.replace(/\.[^.]+$/, "");
 }
 
-function shortLabel(name: string): string {
-  const label = labelFor(name);
+function soundLabel(sound: SoundFile): string {
+  return sound.displayName || labelFor(sound.name);
+}
+
+function shortLabel(sound: SoundFile): string {
+  const label = soundLabel(sound);
   return label.length > 15 ? `${label.slice(0, 14)}…` : label;
 }
 
@@ -59,6 +64,7 @@ function Overlay() {
   const hoveredSoundRef = useRef<SoundFile | null>(null);
 
   const pageCount = Math.max(1, Math.ceil(sounds.length / PAGE_SIZE));
+  const playingSound = playing ? sounds.find((sound) => sound.url === playing) : null;
   const visibleSounds = useMemo(
     () => sounds.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE),
     [page, sounds],
@@ -155,7 +161,7 @@ function Overlay() {
     playbackIdRef.current = playbackId;
     const player = new Audio(sound.url);
     audioRef.current = player;
-    setPlaying(sound.name);
+    setPlaying(sound.url);
 
     const finish = () => {
       if (playbackIdRef.current !== playbackId || audioRef.current !== player) return;
@@ -209,7 +215,7 @@ function Overlay() {
                   (PIE_OUTER_RADIUS + PIE_INNER_RADIUS) / 2,
                   labelAngle,
                 );
-                const isPlaying = playing === sound.name;
+                const isPlaying = playing === sound.url;
 
                 return (
                   <g
@@ -217,7 +223,7 @@ function Overlay() {
                     className={`overlay-slice${isPlaying ? " is-playing" : ""}`}
                     role="button"
                     tabIndex={0}
-                    aria-label={`Tocar ${labelFor(sound.name)}`}
+                    aria-label={`Tocar ${soundLabel(sound)}`}
                     onPointerEnter={() => {
                       hoveredSoundRef.current = sound;
                     }}
@@ -245,7 +251,17 @@ function Overlay() {
                       textAnchor="middle"
                       aria-hidden="true"
                     >
-                      {shortLabel(sound.name)}
+                      <tspan
+                        x={labelPoint.x}
+                        dy="-11"
+                        className="overlay-slice-icon"
+                        style={{ fontFamily: emojiFontFamily }}
+                      >
+                        {sound.emoji}
+                      </tspan>
+                      <tspan x={labelPoint.x} dy="24">
+                        {shortLabel(sound)}
+                      </tspan>
                     </text>
                   </g>
                 );
@@ -258,8 +274,8 @@ function Overlay() {
               </span>
               {sounds.length === 0 ? (
                 <strong>Sem áudios</strong>
-              ) : playing ? (
-                <strong title={labelFor(playing)}>{labelFor(playing)}</strong>
+              ) : playingSound ? (
+                <strong title={soundLabel(playingSound)}>{soundLabel(playingSound)}</strong>
               ) : (
                 <strong>Escolha um som</strong>
               )}
