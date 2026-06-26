@@ -5,6 +5,7 @@ import App from "./App.tsx";
 import Overlay from "./Overlay.tsx";
 import { applyTheme } from "./components/Soundboard/theme.ts";
 import { loadPrefs } from "./components/Soundboard/types.ts";
+import { I18nProvider } from "./i18n";
 
 const overlayMode = new URLSearchParams(window.location.search).has("overlay");
 document.documentElement.classList.toggle("overlay-mode", overlayMode);
@@ -15,5 +16,7 @@ if (!overlayMode) {
 }
 
 createRoot(document.getElementById("root")!).render(
-  <StrictMode>{overlayMode ? <Overlay /> : <App />}</StrictMode>,
+  <StrictMode>
+    <I18nProvider>{overlayMode ? <Overlay /> : <App />}</I18nProvider>
+  </StrictMode>,
 );

@@ -1,0 +1,105 @@
+import type { Messages } from "./en";
+
+/**
+ * Brazilian Portuguese message catalog. The shape must match `en.ts`.
+ *
+ * These strings are the original UI copy the app shipped with before i18n was
+ * introduced, so they are the most carefully reviewed translations.
+ */
+export const ptBR: Messages = {
+  "app.fatalAudio": "A API de áudio não está disponível (preload não carregou). Reinicie o app.",
+  "app.addSoundsAria": "Adicionar áudios",
+  "app.addSoundsTitle": "Adicionar áudios",
+
+  "toolbar.library": "Biblioteca",
+  "toolbar.searchPlaceholder": "Pesquisar áudios…",
+  "toolbar.searchAria": "Pesquisar áudios",
+  "toolbar.clearSearch": "Limpar pesquisa",
+  "toolbar.densityAria": "Densidade da grelha",
+  "toolbar.densityComfort": "Vista confortável",
+  "toolbar.densityCompact": "Vista compacta",
+  "toolbar.sortLabel": "Ordenar",
+  "toolbar.sortNameAsc": "Nome (A-Z)",
+  "toolbar.sortNameDesc": "Nome (Z-A)",
+  "toolbar.sortRecent": "Recentes",
+  "toolbar.overlayOnlyAria": "Só do seletor",
+  "toolbar.overlayOnlyTitle": "Mostrar apenas os áudios do seletor rápido",
+  "toolbar.hideHints": "Ocultar dicas",
+  "toolbar.showHints": "Mostrar dicas",
+  "toolbar.settingsAria": "Definições",
+
+  "shortcut.hintPrefix": "Clique num pad para o tocar. Em qualquer app, ",
+  "shortcut.hintMiddle": " abre o seletor rápido · ",
+  "shortcut.hintSuffix": " fecha.",
+
+  "transport.stopTitle": "Parar",
+  "transport.idleTitle": "Sem reprodução",
+  "transport.stopAria": "Parar reprodução",
+  "transport.idleAria": "Sem reprodução",
+  "transport.playing": "A tocar",
+  "transport.stopped": "Parado",
+  "transport.readyToPlay": "Pronto a reproduzir",
+  "transport.unmute": "Reativar som",
+  "transport.mute": "Silenciar",
+  "transport.volumeAria": "Volume",
+
+  "empty.searchTitle": "Nada encontrado",
+  "empty.libraryTitle": "A sua biblioteca está vazia",
+  "empty.searchBody": "Nenhum áudio corresponde a “{query}”.",
+  "empty.libraryBody":
+    "Adicione ficheiros de áudio com “Adicionar”. Eles são guardados na pasta de dados do utilizador e persistem entre atualizações.",
+  "empty.addSounds": "Adicionar áudios",
+
+  "editor.title": "Editar áudio",
+  "editor.closeAria": "Fechar",
+  "editor.overlayGroup": "No seletor rápido (overlay)",
+  "editor.overlayLabel": "Disponível no seletor rápido (atalho Alt+Shift+S)",
+  "editor.name": "Nome",
+  "editor.namePlaceholder": "Nome do áudio",
+  "editor.emoji": "Emoji",
+  "editor.cancel": "Cancelar",
+  "editor.save": "Salvar",
+
+  "pad.removeFromPicker": "Remover do seletor rápido",
+  "pad.addToPicker": "Adicionar ao seletor rápido",
+  "pad.edit": "Editar áudio",
+  "pad.playing": "A tocar",
+  "pad.play": "Tocar",
+
+  "error.prefix": "Erro:",
+  "error.retry": "Tentar novamente",
+
+  "overlay.aria": "Seletor rápido de áudios",
+  "overlay.soundsAria": "Áudios disponíveis",
+  "overlay.playAria": "Tocar {label}",
+  "overlay.playing": "A tocar",
+  "overlay.soundboard": "Soundboard",
+  "overlay.noSounds": "Sem áudios",
+  "overlay.pick": "Escolha um som",
+  "overlay.prevPage": "Página anterior",
+  "overlay.nextPage": "Próxima página",
+
+  "settings.title": "Definições",
+  "settings.closeAria": "Fechar definições",
+  "settings.micPassthroughGroup": "Microfone real (pass-through)",
+  "settings.micPassthroughLabel": "Passar o meu microfone junto com os áudios",
+  "settings.micLabel": "Microfone",
+  "settings.micNone": "Nenhum microfone encontrado",
+  "settings.monitoringGroup": "Monitorização",
+  "settings.hearClipsLabel":
+    "Ouvir os áudios nos meus fones/caixas (só os áudios, sem a minha voz)",
+  "settings.themeGroup": "Tema",
+  "settings.themeLight": "Claro",
+  "settings.themeDark": "Escuro",
+  "settings.themeSystem": "Sistema",
+  "settings.discordGroup": "Dispositivo no Discord",
+  "settings.discordIntro": "Defina o",
+  "settings.discordInputDevice": "dispositivo de entrada",
+  "settings.discordTo": "como",
+  "settings.globalShortcutHint": "Atalho global {shortcut} abre o seletor rápido · {esc} fecha.",
+
+  "settings.languageGroup": "Idioma",
+  "settings.languageSystem": "Sistema",
+  "settings.languageEn": "English",
+  "settings.languagePtBR": "Português (Brasil)",
+};
