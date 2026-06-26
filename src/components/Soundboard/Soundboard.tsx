@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { Plus } from "lucide-react";
 import type { AudioApi, AudioState, SoundFile, SoundMetadata } from "../../audio-globals";
 import { BrandLogo } from "./BrandLogo";
 import { ErrorBanner } from "./ErrorBanner";
@@ -9,6 +10,7 @@ import { SoundEditor } from "./SoundEditor";
 import { SoundStage } from "./SoundStage";
 import { Topbar } from "./Topbar";
 import { TransportBar } from "./TransportBar";
+import { Button } from "./ui";
 import { cx } from "./styles";
 import { PREFS_KEY, emptyState, loadPrefs, soundLabel } from "./types";
 import type { Prefs, Status } from "./types";
@@ -249,13 +251,7 @@ function Soundboard() {
         "relative z-1 mx-auto flex w-full flex-col gap-4 px-6 pb-32 text-left max-sm:px-3.5 max-sm:pb-36",
       )}
     >
-      <Topbar
-        query={query}
-        ready={soundboardState.ready}
-        settingsOpen={settingsOpen}
-        onQueryChange={setQuery}
-        onSettingsToggle={() => setSettingsOpen((value) => !value)}
-      />
+      <Topbar />
 
       {soundboardState.error && (
         <ErrorBanner
@@ -267,13 +263,14 @@ function Soundboard() {
 
       <LibraryToolbar
         density={prefs.density}
-        disabled={disabled}
         prefs={prefs}
         query={query}
+        settingsOpen={settingsOpen}
         soundCount={soundCount}
         visibleCount={visibleCount}
-        onAddSounds={() => void onAddSounds()}
         onPrefsChange={setPrefs}
+        onQueryChange={setQuery}
+        onSettingsToggle={() => setSettingsOpen((value) => !value)}
       />
 
       {prefs.showHints && soundCount > 0 && <ShortcutBanner />}
@@ -320,6 +317,17 @@ function Soundboard() {
           setVolume(nextVolume);
         }}
       />
+
+      <Button
+        variant="primary"
+        className="fixed right-6 bottom-28 z-10 size-14 gap-0 rounded-full! p-0 shadow-[var(--shadow-lg),var(--inset-hi)] max-sm:bottom-28"
+        onClick={() => void onAddSounds()}
+        disabled={disabled}
+        aria-label="Adicionar áudios"
+        title="Adicionar áudios"
+      >
+        <Plus size={26} aria-hidden="true" />
+      </Button>
     </section>
   );
 }

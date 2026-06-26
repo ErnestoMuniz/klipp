@@ -41,10 +41,10 @@ export function SettingsDrawer({
         aria-hidden={!open}
         aria-label="Definições"
       >
-        <div className="flex items-center justify-between border-b border-(--border) bg-[linear-gradient(180deg,var(--surface-raise),var(--surface))] px-5 pb-3.5 pt-5 shadow-(--inset-hi)">
-          <h2 className="text-lg font-semibold text-(--text-h)">Definições</h2>
-          <Button variant="icon" onClick={onClose} aria-label="Fechar definições">
-            <X size={16} />
+        <div className="flex items-center justify-between border-b border-(--border) bg-[linear-gradient(180deg,var(--surface-raise),var(--surface))] px-5 pb-2 pt-2 shadow-(--inset-hi)">
+          <span className="text-lg font-semibold text-(--text-h)">Definições</span>
+          <Button variant="ghost" onClick={onClose} aria-label="Fechar definições">
+            <X size={22} />
           </Button>
         </div>
 

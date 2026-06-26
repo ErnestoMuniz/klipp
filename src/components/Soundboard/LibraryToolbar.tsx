@@ -1,28 +1,30 @@
-import { LayoutGrid, Music, Plus, Rows3, Star } from "lucide-react";
+import { LayoutGrid, Lightbulb, Music, Rows3, Search, Settings, Star, X } from "lucide-react";
 import type { Density, Prefs, SortMode } from "./types";
 import { cx } from "./styles";
 import { Badge, Button, IconTile, Select } from "./ui";
 
 interface LibraryToolbarProps {
   density: Density;
-  disabled: boolean;
   prefs: Prefs;
   query: string;
+  settingsOpen: boolean;
   soundCount: number;
   visibleCount: number;
-  onAddSounds: () => void;
   onPrefsChange: (updater: (prefs: Prefs) => Prefs) => void;
+  onQueryChange: (query: string) => void;
+  onSettingsToggle: () => void;
 }
 
 export function LibraryToolbar({
   density,
-  disabled,
   prefs,
   query,
+  settingsOpen,
   soundCount,
   visibleCount,
-  onAddSounds,
   onPrefsChange,
+  onQueryChange,
+  onSettingsToggle,
 }: LibraryToolbarProps) {
   return (
     <div className="flex flex-wrap items-center justify-between gap-3 px-0.5 pb-0.5 pt-1.5">
@@ -40,6 +42,31 @@ export function LibraryToolbar({
       </div>
 
       <div className="inline-flex flex-wrap items-center gap-2.5">
+        <div className="flex h-10 min-w-56 flex-1 items-center gap-2 rounded-lg border border-(--border) bg-(--surface-sunk) px-3 shadow-(--inset-lo) transition focus-within:border-(--accent-border) focus-within:bg-(--surface) focus-within:shadow-[0_0_0_4px_var(--accent-bg),var(--inset-hi)]">
+          <span className="shrink-0 text-(--text-faint)" aria-hidden="true">
+            <Search size={17} />
+          </span>
+          <input
+            type="search"
+            className="min-w-0 flex-1 border-0 bg-transparent text-sm text-(--text-h) outline-none placeholder:text-(--text-faint) appearance-none [&::-webkit-search-cancel-button]:appearance-none"
+            placeholder="Pesquisar áudios…"
+            value={query}
+            onChange={(event) => onQueryChange(event.target.value)}
+            aria-label="Pesquisar áudios"
+          />
+          {query && (
+            <Button
+              variant="quietIcon"
+              size="sm"
+              className="size-6 rounded-full border-0 bg-(--border) shadow-none hover:bg-(--accent) hover:text-(--accent-ink)"
+              onClick={() => onQueryChange("")}
+              aria-label="Limpar pesquisa"
+            >
+              <X size={11} />
+            </Button>
+          )}
+        </div>
+
         <div
           className="hidden gap-1 rounded-md border border-(--border) bg-(--surface-sunk) p-1 shadow-(--inset-lo) sm:inline-flex"
           role="group"
@@ -76,35 +103,40 @@ export function LibraryToolbar({
 
         <Button
           variant="ghost"
-          className={cx("inline-flex items-center gap-1.5", prefs.onlyOverlay && "text-(--accent)")}
+          className={cx("size-10 p-0", prefs.onlyOverlay && "text-(--accent)")}
           onClick={() =>
             onPrefsChange((current) => ({ ...current, onlyOverlay: !current.onlyOverlay }))
           }
           aria-pressed={prefs.onlyOverlay}
+          aria-label="Só do seletor"
           title="Mostrar apenas os áudios do seletor rápido"
         >
-          <Star size={15} aria-hidden="true" />
-          <span className="hidden sm:inline">Só do seletor</span>
-          <span className="sm:hidden" aria-hidden="true">
-            Seletor
-          </span>
+          <Star size={18} aria-hidden="true" />
         </Button>
 
         <Button
           variant="ghost"
-          className="hidden sm:block"
+          className={cx("size-10 p-0", prefs.showHints && "text-(--accent)")}
           onClick={() =>
             onPrefsChange((current) => ({ ...current, showHints: !current.showHints }))
           }
           aria-pressed={prefs.showHints}
-          title="Mostrar/ocultar dicas"
+          aria-label={prefs.showHints ? "Ocultar dicas" : "Mostrar dicas"}
+          title={prefs.showHints ? "Ocultar dicas" : "Mostrar dicas"}
         >
-          {prefs.showHints ? "Ocultar dicas" : "Mostrar dicas"}
+          <Lightbulb size={18} aria-hidden="true" />
         </Button>
 
-        <Button variant="primary" onClick={onAddSounds} disabled={disabled}>
-          <Plus size={16} aria-hidden="true" />
-          Adicionar
+        <Button
+          active={settingsOpen}
+          variant="ghost"
+          className="size-10 p-0"
+          onClick={onSettingsToggle}
+          aria-expanded={settingsOpen}
+          aria-label="Definições"
+          title="Definições"
+        >
+          <Settings size={20} />
         </Button>
       </div>
     </div>
