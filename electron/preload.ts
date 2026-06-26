@@ -26,6 +26,8 @@ contextBridge.exposeInMainWorld("audio", {
   setHearClips: (enabled: boolean) => ipcRenderer.invoke("audio:set-hear-clips", enabled),
   addSounds: () => ipcRenderer.invoke("audio:add-sounds"),
   relistSounds: () => ipcRenderer.invoke("audio:relist-sounds"),
+  updateSoundMetadata: (url: string, metadata: { emoji: string; displayName: string }) =>
+    ipcRenderer.invoke("audio:update-sound-metadata", url, metadata),
 });
 
 contextBridge.exposeInMainWorld("overlay", {

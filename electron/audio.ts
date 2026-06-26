@@ -14,9 +14,14 @@ interface StoredSettings {
 }
 
 const SETTINGS_FILE = "settings.json";
+const SOUND_METADATA_FILE = "sound-metadata.json";
 
 function settingsPath(): string {
   return path.join(app.getPath("userData"), SETTINGS_FILE);
+}
+
+function soundMetadataPath(): string {
+  return path.join(app.getPath("userData"), SOUND_METADATA_FILE);
 }
 
 async function loadSettings(): Promise<StoredSettings> {
@@ -37,6 +42,28 @@ async function loadSettings(): Promise<StoredSettings> {
 async function saveSettings(settings: StoredSettings): Promise<void> {
   await fs.mkdir(path.dirname(settingsPath()), { recursive: true });
   await fs.writeFile(settingsPath(), JSON.stringify(settings, null, 2), "utf-8");
+}
+
+export interface SoundMetadata {
+  emoji: string;
+  displayName: string;
+}
+
+type StoredSoundMetadata = Record<string, Partial<SoundMetadata>>;
+
+async function loadSoundMetadata(): Promise<StoredSoundMetadata> {
+  try {
+    const raw = await fs.readFile(soundMetadataPath(), "utf-8");
+    const parsed = JSON.parse(raw) as StoredSoundMetadata;
+    return parsed && typeof parsed === "object" ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+async function saveSoundMetadata(metadata: StoredSoundMetadata): Promise<void> {
+  await fs.mkdir(path.dirname(soundMetadataPath()), { recursive: true });
+  await fs.writeFile(soundMetadataPath(), JSON.stringify(metadata, null, 2), "utf-8");
 }
 
 // Clips-only sink. The renderer plays soundboard clips here (via PULSE_SINK).
@@ -66,6 +93,8 @@ export interface MicSource {
 }
 
 export interface SoundFile {
+  emoji: string;
+  displayName: string;
   name: string;
   url: string;
 }
@@ -160,6 +189,7 @@ export class AudioManager {
   defaultSink = "";
   discordDeviceName = VIRTUAL_MIC_DESCRIPTION;
   sounds: SoundFile[] = [];
+  private soundMetadata: StoredSoundMetadata = {};
 
   private soundsDir(): string {
     const root = process.env.APP_ROOT ?? process.cwd();
@@ -205,6 +235,7 @@ export class AudioManager {
 
       await this.applyMicLoopback();
       await this.applyHearClips();
+      this.soundMetadata = await loadSoundMetadata();
       this.sounds = await this.listSounds();
       this.discordDeviceName = sourceDescription(
         await runPactl(["list", "sources"]),
@@ -349,13 +380,41 @@ export class AudioManager {
       return entries
         .filter((name) => AUDIO_EXTS.has(path.extname(name).slice(1).toLowerCase()))
         .sort((a, b) => a.localeCompare(b))
-        .map((name) => ({ name, url: `sounds/${encodeURIComponent(name)}` }));
+        .map((name) => {
+          const url = `sounds/${encodeURIComponent(name)}`;
+          const metadata = this.soundMetadata[url] ?? {};
+          const displayName =
+            typeof metadata.displayName === "string" && metadata.displayName.trim()
+              ? metadata.displayName.trim()
+              : path.basename(name, path.extname(name));
+          const emoji =
+            typeof metadata.emoji === "string" && metadata.emoji.trim()
+              ? metadata.emoji.trim()
+              : "♪";
+          return { emoji, displayName, name, url };
+        });
     } catch {
       return [];
     }
   }
 
   async relistSounds(): Promise<AudioState> {
+    this.sounds = await this.listSounds();
+    return this.getState();
+  }
+
+  async updateSoundMetadata(url: string, metadata: SoundMetadata): Promise<AudioState> {
+    const sound = this.sounds.find((candidate) => candidate.url === url);
+    if (!sound) return this.getState();
+
+    const displayName =
+      metadata.displayName.trim() || path.basename(sound.name, path.extname(sound.name));
+    const emoji = metadata.emoji.trim() || "♪";
+    this.soundMetadata = {
+      ...this.soundMetadata,
+      [url]: { displayName, emoji },
+    };
+    await saveSoundMetadata(this.soundMetadata);
     this.sounds = await this.listSounds();
     return this.getState();
   }
@@ -400,4 +459,9 @@ export function registerAudioIpc(manager: AudioManager): void {
   );
   ipcMain.handle("audio:add-sounds", async () => manager.addSounds());
   ipcMain.handle("audio:relist-sounds", async () => manager.relistSounds());
+  ipcMain.handle(
+    "audio:update-sound-metadata",
+    async (_event, url: string, metadata: SoundMetadata) =>
+      manager.updateSoundMetadata(url, metadata),
+  );
 }

@@ -1,4 +1,5 @@
 import type { AudioState } from "../../audio-globals";
+import type { SoundFile } from "../../audio-globals";
 
 export type Status = "idle" | "busy";
 export type Density = "comfort" | "compact";
@@ -51,6 +52,10 @@ export function loadPrefs(): Prefs {
 
 export function labelFor(name: string): string {
   return name.replace(/\.[^.]+$/, "");
+}
+
+export function soundLabel(sound: SoundFile): string {
+  return sound.displayName || labelFor(sound.name);
 }
 
 export function initials(name: string): string {

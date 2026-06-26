@@ -4,8 +4,15 @@ export interface MicSource {
 }
 
 export interface SoundFile {
+  emoji: string;
+  displayName: string;
   name: string;
   url: string;
+}
+
+export interface SoundMetadata {
+  emoji: string;
+  displayName: string;
 }
 
 export interface AudioState {
@@ -30,6 +37,7 @@ export interface AudioApi {
   setHearClips: (enabled: boolean) => Promise<AudioState>;
   addSounds: () => Promise<AudioState>;
   relistSounds: () => Promise<AudioState>;
+  updateSoundMetadata: (url: string, metadata: SoundMetadata) => Promise<AudioState>;
 }
 
 export interface IpcRendererApi {
