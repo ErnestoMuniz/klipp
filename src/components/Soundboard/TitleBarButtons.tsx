@@ -1,12 +1,15 @@
 import { useEffect, useState } from "react";
+import { Minus, Square, Copy, X } from "lucide-react";
 
 /**
- * Custom macOS-style traffic-light window controls (close / minimize /
- * maximize). Rendered inside the (frameless) main window's Topbar. The
- * buttons are left-aligned, like native macOS traffic lights.
+ * Window controls (close / minimize / maximize) rendered inside the
+ * frameless main window's Topbar.
  *
- * The whole group opts out of the Topbar's drag region so each button stays
- * clickable.
+ * Styled as a compact "console module": a single inset tray holding three
+ * square buttons separated by hairline dividers, matching the app's studio
+ * aesthetic. Glyphs stay hidden until hover; minimize/maximize light up in
+ * the accent blue, close signals danger in red. The whole group opts out of
+ * the Topbar's drag region so each button stays clickable.
  */
 export function TitleBarButtons() {
   const controls = window.windowControls;
@@ -22,46 +25,55 @@ export function TitleBarButtons() {
   const available = Boolean(controls);
 
   return (
-    <div className="app-no-drag flex shrink-0 items-center gap-2" aria-label="Controles da janela">
-      <TrafficLight
+    <div
+      className="app-no-drag mr-1 flex shrink-0 items-center gap-2"
+      aria-label="Controles da janela"
+    >
+      <ControlButton
         label="Minimizar"
-        color="minimize"
+        tone="accent"
         disabled={!available}
         onClick={() => controls?.minimize()}
       >
-        <MinimizeGlyph />
-      </TrafficLight>
-      <TrafficLight
+        <Minus className="size-4" strokeWidth={2.25} />
+      </ControlButton>
+
+      <ControlButton
         label={maximized ? "Restaurar" : "Maximizar"}
-        color="maximize"
+        tone="accent"
         disabled={!available}
         onClick={() => controls?.toggleMaximize()}
       >
-        <MaximizeGlyph maximized={maximized} />
-      </TrafficLight>
-      <TrafficLight
+        {maximized ? (
+          <Copy className="size-3" strokeWidth={2.25} />
+        ) : (
+          <Square className="size-3" strokeWidth={2.25} />
+        )}
+      </ControlButton>
+
+      <ControlButton
         label="Fechar"
-        color="close"
+        tone="danger"
         disabled={!available}
         onClick={() => controls?.close()}
       >
-        <CloseGlyph />
-      </TrafficLight>
+        <X className="size-4" strokeWidth={2.25} />
+      </ControlButton>
     </div>
   );
 }
 
-type TrafficColor = "close" | "minimize" | "maximize";
+type Tone = "accent" | "danger";
 
-interface TrafficLightProps {
+interface ControlButtonProps {
   label: string;
-  color: TrafficColor;
+  tone: Tone;
   disabled?: boolean;
   onClick: () => void;
   children: React.ReactNode;
 }
 
-function TrafficLight({ label, color, disabled, onClick, children }: TrafficLightProps) {
+function ControlButton({ label, tone, disabled, onClick, children }: ControlButtonProps) {
   return (
     <button
       type="button"
@@ -70,80 +82,20 @@ function TrafficLight({ label, color, disabled, onClick, children }: TrafficLigh
       disabled={disabled}
       onClick={onClick}
       className={cx(
-        "tl group grid size-3.5 place-items-center rounded-full border border-black/15 transition-all duration-150",
-        "enabled:cursor-pointer enabled:hover:scale-105 disabled:cursor-default",
-        color === "close" && "tl-close",
-        color === "minimize" && "tl-minimize",
-        color === "maximize" && "tl-maximize",
+        "tb-btn group relative grid size-6 place-items-center rounded-sm transition-[background-color,box-shadow,color] duration-150",
+        "text-(--text-faint)",
+        "enabled:cursor-pointer disabled:cursor-default disabled:opacity-40",
+        "enabled:hover:text-(--text-h)",
+        tone === "accent" && "enabled:hover:bg-(--accent-bg) enabled:hover:text-(--accent-deep)",
+        tone === "danger" &&
+          "enabled:hover:bg-[color-mix(in_srgb,#e0494a_14%,transparent)] enabled:hover:text-[#d23b3c]",
+        "enabled:active:shadow-(--inset-lo)",
       )}
     >
-      <span className="tl-glyph pointer-events-none opacity-0 transition-opacity duration-150 group-hover:opacity-100">
+      <span className="pointer-events-none transition-opacity duration-150 group-disabled:opacity-0">
         {children}
       </span>
     </button>
-  );
-}
-
-function CloseGlyph() {
-  return (
-    <svg viewBox="0 0 10 10" className="size-2" aria-hidden="true">
-      <path
-        d="M2 2 L8 8 M8 2 L2 8"
-        className="tl-stroke"
-        fill="none"
-        strokeWidth="1.4"
-        strokeLinecap="round"
-      />
-    </svg>
-  );
-}
-
-function MinimizeGlyph() {
-  return (
-    <svg viewBox="0 0 10 10" className="size-2" aria-hidden="true">
-      <path d="M2 5 H8" className="tl-stroke" fill="none" strokeWidth="1.4" strokeLinecap="round" />
-    </svg>
-  );
-}
-
-function MaximizeGlyph({ maximized }: { maximized: boolean }) {
-  if (maximized) {
-    // two overlapping rectangles (restore)
-    return (
-      <svg viewBox="0 0 10 10" className="size-2" aria-hidden="true">
-        <rect
-          x="2.4"
-          y="1.6"
-          width="4.4"
-          height="4.4"
-          rx="0.6"
-          className="tl-stroke"
-          fill="none"
-          strokeWidth="1.2"
-        />
-        <rect
-          x="3.6"
-          y="3.2"
-          width="4.4"
-          height="4.4"
-          rx="0.6"
-          className="tl-stroke"
-          fill="none"
-          strokeWidth="1.2"
-        />
-      </svg>
-    );
-  }
-  return (
-    <svg viewBox="0 0 10 10" className="size-2" aria-hidden="true">
-      <path
-        d="M2.6 2 L7.4 2 L7.4 7 L4.6 7 L2.6 5 Z"
-        className="tl-stroke"
-        fill="none"
-        strokeWidth="1.2"
-        strokeLinejoin="round"
-      />
-    </svg>
   );
 }
 
