@@ -17,7 +17,7 @@ const ghostButtonClass =
   "cursor-pointer rounded-sm border border-transparent bg-transparent px-3 py-2 text-sm font-medium text-(--text) hover:bg-(--surface-sunk) hover:text-(--text-h) aria-pressed:text-(--accent)";
 
 const secondaryButtonClass =
-  "cursor-pointer rounded-sm border border-(--border-strong) bg-[linear-gradient(180deg,var(--surface-raise),var(--surface))] px-3 py-2 font-medium text-(--text-h) shadow-[var(--shadow-sm),var(--inset-hi)] hover:border-(--accent-border) hover:text-(--accent) disabled:opacity-55";
+  "cursor-pointer rounded-sm border border-(--border) bg-[linear-gradient(180deg,var(--surface-raise),var(--surface))] px-3 py-2 font-medium text-(--text-h) shadow-[var(--shadow-sm),var(--inset-hi)] hover:text-(--accent) disabled:opacity-55";
 
 const quietIconButtonClass =
   "grid shrink-0 cursor-pointer place-items-center border border-(--border) bg-(--surface-sunk) text-(--text-h) shadow-(--inset-lo) hover:border-(--accent-border) hover:text-(--accent)";

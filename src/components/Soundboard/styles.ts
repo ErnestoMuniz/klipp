@@ -12,7 +12,7 @@ export const activeIconButtonClass =
   "border-(--accent) bg-(--accent-bg) text-(--accent) shadow-[0_0_0_3px_var(--accent-bg),var(--inset-hi)]";
 
 export const primaryButtonClass =
-  "inline-flex items-center gap-1.5 rounded-md border border-(--accent-deep) bg-[linear-gradient(180deg,var(--accent),var(--accent-deep))] px-4 py-2 text-sm font-semibold text-(--accent-ink) shadow-[0_1px_2px_rgba(40,30,15,0.12),0_6px_16px_-8px_var(--accent-glow),inset_0_1px_0_rgba(255,255,255,0.25)] transition active:translate-y-px disabled:cursor-not-allowed disabled:opacity-45 disabled:shadow-none enabled:cursor-pointer enabled:hover:bg-[linear-gradient(180deg,color-mix(in_srgb,var(--accent)_92%,#fff_8%),var(--accent-deep))] enabled:hover:shadow-[0_1px_2px_rgba(40,30,15,0.16),0_8px_20px_-8px_var(--accent-glow),inset_0_1px_0_rgba(255,255,255,0.3)]";
+  "inline-flex items-center gap-1.5 rounded-md border border-(--accent-deep) bg-[linear-gradient(180deg,var(--accent),var(--accent-deep))] px-4 py-2 text-sm font-semibold text-(--accent-ink) transition active:translate-y-px disabled:cursor-not-allowed disabled:opacity-45 disabled:shadow-none enabled:cursor-pointer enabled:hover:bg-[linear-gradient(180deg,color-mix(in_srgb,var(--accent)_92%,#fff_8%),var(--accent-deep))]";
 
 export const dividerClass =
   "h-px bg-[linear-gradient(90deg,transparent,var(--border),transparent)]";
