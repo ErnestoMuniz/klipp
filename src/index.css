@@ -1,6 +1,12 @@
 @import "tailwindcss";
 @import "./Overlay.css";
 
+@font-face {
+  font-family: "Klipp Emoji";
+  src: url("/fonts/NotoColorEmoji.ttf") format("truetype");
+  font-display: swap;
+}
+
 /* =========================================================================
    Klipp — design tokens
    A "studio console" palette: warm paper / charcoal surfaces, a signal-red
@@ -209,4 +215,65 @@ code {
   background: var(--code-bg);
   border: 1px solid var(--hairline);
   letter-spacing: 0;
+}
+
+/* ===== Studio scrollbar =====
+   A chunky, rounded bar that echoes the app's layered surfaces: a recessed
+   track with a soft inner shadow, and a thumb built from a warm gradient
+   with an inset top highlight (the same trick used on raised tiles). Hovers
+   and active states light up in the signal accent.
+   ====================================================================== */
+.sb-scroll {
+  scrollbar-width: auto;
+  scrollbar-color: var(--border-strong) transparent;
+  scrollbar-gutter: stable;
+}
+.sb-scroll::-webkit-scrollbar {
+  width: 14px;
+  height: 14px;
+}
+.sb-scroll::-webkit-scrollbar-track {
+  background: var(--surface-sunk);
+  border-radius: 999px;
+  margin: 4px;
+  box-shadow: inset 0 1px 2px rgba(40, 30, 15, 0.12);
+}
+.sb-scroll::-webkit-scrollbar-track-piece {
+  background: transparent;
+}
+.sb-scroll::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, var(--surface-raise), var(--border-strong));
+  border-radius: 999px;
+  border: 3px solid transparent;
+  background-clip: padding-box;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.5),
+    0 1px 2px rgba(40, 30, 15, 0.12);
+  transition: background 0.15s ease;
+}
+.sb-scroll::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--accent) 70%, var(--surface-raise) 30%),
+    var(--accent-deep)
+  );
+  background-clip: padding-box;
+}
+.sb-scroll::-webkit-scrollbar-thumb:active {
+  background: linear-gradient(180deg, var(--accent), var(--accent-deep));
+  background-clip: padding-box;
+}
+.sb-scroll::-webkit-scrollbar-corner {
+  background: transparent;
+}
+@media (prefers-color-scheme: dark) {
+  .sb-scroll::-webkit-scrollbar-track {
+    box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.5);
+  }
+  .sb-scroll::-webkit-scrollbar-thumb {
+    background: linear-gradient(180deg, var(--surface-raise), var(--border-strong));
+    box-shadow:
+      inset 0 1px 0 rgba(255, 248, 235, 0.08),
+      0 1px 2px rgba(0, 0, 0, 0.4);
+  }
 }
