@@ -51,6 +51,12 @@ export interface IpcRendererApi {
   invoke: <T = unknown>(channel: string, ...args: unknown[]) => Promise<T>;
 }
 
+export interface WindowControlsApi {
+  minimize: () => void;
+  toggleMaximize: () => void;
+  close: () => void;
+}
+
 export interface OverlayApi {
   hide: () => void;
   pointerReady: () => void;
@@ -63,5 +69,6 @@ declare global {
     audio?: AudioApi;
     ipcRenderer?: IpcRendererApi;
     overlay?: OverlayApi;
+    windowControls?: WindowControlsApi;
   }
 }

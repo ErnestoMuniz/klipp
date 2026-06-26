@@ -90,12 +90,24 @@ function createWindow(): void {
     icon: path.join(process.env.VITE_PUBLIC!, "favicon.svg"),
     width: 900,
     height: 720,
+    // Frameless window so the renderer owns the whole chrome (custom
+    // macOS-style traffic-light buttons live in the Topbar). On macOS
+    // `titleBarStyle: "hidden"" keeps a draggable title bar region but
+    // removes the native title text + buttons; everywhere else `frame: false`
+    // removes the system title bar entirely.
+    frame: process.platform === "darwin" ? undefined : false,
+    titleBarStyle: "hidden",
+    autoHideMenuBar: true,
     webPreferences: {
       preload: path.join(__dirname, "preload.mjs"),
       sandbox: false,
       backgroundThrottling: false,
     },
   });
+
+  // No application menu, no visible menu bar — the app drives everything via
+  // its own UI.
+  win.setMenuBarVisibility(false);
 
   win.on("close", (event) => {
     if (!isQuitting) {
@@ -104,8 +116,12 @@ function createWindow(): void {
     }
   });
 
+  win.on("maximize", () => win?.webContents.send("window:maximized", true));
+  win.on("unmaximize", () => win?.webContents.send("window:maximized", false));
+
   win.webContents.on("did-finish-load", () => {
     win?.webContents.send("main-process-message", new Date().toLocaleString());
+    win?.webContents.send("window:maximized", win?.isMaximized() ?? false);
   });
 
   loadRenderer(win);
@@ -408,7 +424,24 @@ process.on("SIGTERM", () => {
   cleanupAndExit(0);
 });
 
+// Frameless main window: custom macOS-style traffic-light controls live in
+// the renderer Topbar, so drive minimize / maximize / close from there.
+ipcMain.on("window:minimize", () => win?.minimize());
+ipcMain.on("window:toggle-maximize", () => {
+  if (!win) return;
+  if (win.isMaximized()) win.unmaximize();
+  else win.maximize();
+});
+ipcMain.on("window:close", () => {
+  if (!win) return;
+  isQuitting = false;
+  win.close();
+});
+
 void app.whenReady().then(async () => {
+  // No application menu, no visible menu bar — the UI owns all chrome.
+  Menu.setApplicationMenu(null);
+
   registerSoundProtocol();
   await audio.init();
   registerAudioIpc(audio);

@@ -31,6 +31,12 @@ contextBridge.exposeInMainWorld("audio", {
     ipcRenderer.invoke("audio:update-sound-metadata", url, metadata),
 });
 
+contextBridge.exposeInMainWorld("windowControls", {
+  minimize: () => ipcRenderer.send("window:minimize"),
+  toggleMaximize: () => ipcRenderer.send("window:toggle-maximize"),
+  close: () => ipcRenderer.send("window:close"),
+});
+
 contextBridge.exposeInMainWorld("overlay", {
   hide: () => ipcRenderer.send("overlay:hide"),
   pointerReady: () => ipcRenderer.send("overlay:pointer-ready"),

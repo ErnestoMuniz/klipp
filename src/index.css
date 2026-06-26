@@ -124,6 +124,57 @@
   }
 }
 
+/* ===== Frameless window drag regions ======
+   The main window is frameless; the Topbar acts as the draggable title
+   bar. Interactive controls inside it opt out of dragging so they stay
+   clickable. (Overlay windows are separate and never use these.)
+   ====================================================================== */
+.app-drag {
+  -webkit-app-region: drag;
+  app-region: drag;
+}
+.app-no-drag {
+  -webkit-app-region: no-drag;
+  app-region: no-drag;
+}
+
+/* ===== macOS-style traffic-light window controls =====
+   Rendered in the frameless main window's Topbar. Three colored circles
+   (close / minimize / maximize) like native macOS traffic lights, with a
+   dark glyph revealed on hover. Colors stay vivid in both themes.
+   ====================================================================== */
+.tl {
+  --tl-close: #ff5f57;
+  --tl-minimize: #ffbd2e;
+  --tl-maximize: #28c940;
+  --tl-glyph: #4d0000;
+}
+.tl-close {
+  background: var(--tl-close);
+  --tl-glyph: #7a0a09;
+  box-shadow: inset 0 0 0 0.4px rgba(0, 0, 0, 0.18);
+}
+.tl-minimize {
+  background: var(--tl-minimize);
+  --tl-glyph: #8a5a00;
+  box-shadow: inset 0 0 0 0.4px rgba(0, 0, 0, 0.18);
+}
+.tl-maximize {
+  background: var(--tl-maximize);
+  --tl-glyph: #0b4d18;
+  box-shadow: inset 0 0 0 0.4px rgba(0, 0, 0, 0.18);
+}
+.tl .tl-stroke {
+  stroke: var(--tl-glyph);
+}
+@media (max-width: 600px) {
+  /* keep traffic lights tappable but a touch smaller on tiny screens */
+  .tl {
+    width: 13px;
+    height: 13px;
+  }
+}
+
 /* ===== App frame ===== */
 #root {
   width: 100%;
