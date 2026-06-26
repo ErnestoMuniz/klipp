@@ -1,3 +1,4 @@
+import logo from "../../assets/logo.webp";
 import { logoClass } from "./styles";
 
 interface BrandLogoProps {
@@ -6,11 +7,8 @@ interface BrandLogoProps {
 
 export function BrandLogo({ large = false }: BrandLogoProps) {
   return (
-    <div
-      className={large ? `${logoClass} size-14 rounded-2xl text-2xl` : logoClass}
-      aria-hidden="true"
-    >
-      K
+    <div className={large ? `${logoClass} size-14 rounded-2xl` : logoClass} aria-hidden="true">
+      <img src={logo} alt="" className="size-full" />
     </div>
   );
 }

@@ -86,8 +86,11 @@ function loadRenderer(window: BrowserWindow, query?: Record<string, string>): vo
 }
 
 function createWindow(): void {
+  const iconPath = path.join(process.env.VITE_PUBLIC!, "logo.png");
+  const icon = nativeImage.createFromPath(iconPath);
+
   win = new BrowserWindow({
-    icon: path.join(process.env.VITE_PUBLIC!, "favicon.svg"),
+    icon,
     width: 900,
     height: 720,
     // Frameless window so the renderer owns the whole chrome (custom
@@ -138,7 +141,7 @@ function showWindow() {
 }
 
 function createTray() {
-  const iconPath = path.join(process.env.VITE_PUBLIC!, "tray-icon-32.png");
+  const iconPath = path.join(process.env.VITE_PUBLIC!, "tray-32.png");
   const icon = nativeImage.createFromPath(iconPath);
   tray = new Tray(icon.isEmpty() ? nativeImage.createEmpty() : icon);
 

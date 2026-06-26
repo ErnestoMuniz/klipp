@@ -39,5 +39,8 @@
       "version": "11.8.0",
       "onFail": "download"
     }
+  },
+  "build": {
+    "icon": "public/logo.png"
   }
 }
