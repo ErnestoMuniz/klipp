@@ -1,7 +1,9 @@
-import { useEffect, useState } from "react";
-import { X } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { Search, X } from "lucide-react";
 import type { SoundFile, SoundMetadata } from "../../audio-globals";
 import { EMOJI_GROUPS } from "./emojiData";
+import type { EmojiOption } from "./emojiData";
+import { EMOJI_SEARCH_INDEX } from "./emojiSearchData";
 import { emojiFontFamily } from "./emojiFont";
 import { Button, FieldGroup, Switch } from "./ui";
 import { soundLabel } from "./types";
@@ -35,11 +37,32 @@ interface SoundEditorProps {
 }
 
 export function SoundEditor({ disabled, sound, onClose, onSave }: SoundEditorProps) {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const [displayName, setDisplayName] = useState("");
   const [emoji, setEmoji] = useState("♪");
   const [inOverlay, setInOverlay] = useState(true);
   const [activeGroup, setActiveGroup] = useState<EmojiGroupLabel>(DEFAULT_EMOJI_GROUP);
+  const [searchQuery, setSearchQuery] = useState("");
+
+  const localizedIndex = EMOJI_SEARCH_INDEX[locale];
+
+  const searchResults = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
+    if (!query) return null;
+    const results: EmojiOption[] = [];
+    for (const group of EMOJI_GROUPS) {
+      for (const subgroup of group.subgroups) {
+        for (const option of subgroup.emojis) {
+          // Prefer the search index for the app's selected language (lowercased
+          // localized name + CLDR keywords); fall back to the English name.
+          const haystack =
+            localizedIndex?.[option.emoji]?.toLowerCase() ?? option.name.toLowerCase();
+          if (haystack.includes(query)) results.push(option);
+        }
+      }
+    }
+    return results;
+  }, [searchQuery, localizedIndex]);
 
   useEffect(() => {
     if (!sound) return;
@@ -49,6 +72,8 @@ export function SoundEditor({ disabled, sound, onClose, onSave }: SoundEditorPro
   }, [sound]);
 
   if (!sound) return null;
+
+  const isSearching = searchResults !== null;
 
   return (
     <div
@@ -102,59 +127,105 @@ export function SoundEditor({ disabled, sound, onClose, onSave }: SoundEditorPro
         </label>
 
         <div className="flex min-h-0 flex-1 flex-col gap-3">
-          <div className="font-mono text-xs font-semibold uppercase tracking-widest text-(--text-faint)">
-            {t("editor.emoji")}
+          <div className="flex items-center justify-between gap-3">
+            <div className="font-mono text-xs font-semibold uppercase tracking-widest text-(--text-faint)">
+              {t("editor.emoji")}
+            </div>
+            <div className="relative max-w-64 flex-1">
+              <Search
+                size={16}
+                className="pointer-events-none absolute top-1/2 left-2.5 -translate-y-1/2 text-(--text-faint)"
+              />
+              <input
+                className="h-8 w-full rounded-sm border border-(--border) bg-(--surface-sunk) pr-2.5 pl-8 text-sm text-(--text-h) shadow-(--inset-lo) outline-none transition placeholder:text-(--text-faint) focus:border-(--accent-border)"
+                value={searchQuery}
+                onChange={(event) => setSearchQuery(event.target.value)}
+                placeholder={t("editor.searchPlaceholder")}
+                aria-label={t("editor.searchAria")}
+              />
+            </div>
           </div>
-          <div className="flex shrink-0 gap-1 overflow-x-auto rounded-sm border border-(--border) bg-(--surface-sunk) p-1 shadow-(--inset-lo) scrollbar-none [&::-webkit-scrollbar]:hidden">
-            {EMOJI_GROUPS.map((group) => (
-              <button
-                key={group.label}
-                type="button"
-                className={cx(
-                  "min-h-8 flex-1 shrink-0 cursor-pointer whitespace-nowrap rounded-sm px-2.5 py-1.5 text-xs font-semibold text-(--text-faint) transition hover:text-(--accent) hover:bg-(--surface-raise)",
-                  activeGroup === group.label && "bg-(--surface-raise) text-(--text-h)",
-                )}
-                aria-pressed={activeGroup === group.label}
-                onClick={() => setActiveGroup(group.label)}
-              >
-                {group.label}
-              </button>
-            ))}
-          </div>
+          {!isSearching && (
+            <div className="flex shrink-0 gap-1 overflow-x-auto rounded-sm border border-(--border) bg-(--surface-sunk) p-1 shadow-(--inset-lo) scrollbar-none [&::-webkit-scrollbar]:hidden">
+              {EMOJI_GROUPS.map((group) => (
+                <button
+                  key={group.label}
+                  type="button"
+                  className={cx(
+                    "min-h-8 flex-1 shrink-0 cursor-pointer whitespace-nowrap rounded-sm px-2.5 py-1.5 text-xs font-semibold text-(--text-faint) transition hover:text-(--accent) hover:bg-(--surface-raise)",
+                    activeGroup === group.label && "bg-(--surface-raise) text-(--text-h)",
+                  )}
+                  aria-pressed={activeGroup === group.label}
+                  onClick={() => setActiveGroup(group.label)}
+                >
+                  {group.label}
+                </button>
+              ))}
+            </div>
+          )}
           <div
             className={cx(
               "min-h-0 flex-1 overflow-y-auto rounded-sm border border-(--border) bg-(--surface-sunk) p-2 shadow-(--inset-lo)",
               emojiPickerScrollbarClass,
             )}
           >
-            {EMOJI_GROUPS.find((group) => group.label === activeGroup)!.subgroups.map(
-              (subgroup) => (
-                <section key={subgroup.label} className="mb-3 last:mb-0">
-                  <h3 className="m-0 mb-1.5 font-mono text-[11px] font-semibold uppercase tracking-widest text-(--text-faint)">
-                    {subgroup.label}
-                  </h3>
-                  <div className="grid grid-cols-16 gap-1.5 max-lg:grid-cols-14 max-md:grid-cols-12 max-sm:grid-cols-10">
-                    {subgroup.emojis.map((option) => (
-                      <button
-                        key={option.emoji}
-                        type="button"
-                        className={cx(
-                          "grid aspect-square min-h-11 cursor-pointer place-items-center rounded-sm border border-transparent text-2xl transition hover:border-(--accent-border) hover:bg-(--surface-raise)",
-                          emoji === option.emoji &&
-                            "border-(--accent) bg-(--accent-bg) shadow-[0_0_0_3px_var(--accent-bg)]",
-                        )}
-                        style={emojiStyle}
-                        aria-label={option.name}
-                        aria-pressed={emoji === option.emoji}
-                        title={option.name}
-                        onClick={() => setEmoji(option.emoji)}
-                      >
-                        {option.emoji}
-                      </button>
-                    ))}
-                  </div>
-                </section>
-              ),
+            {isSearching ? (
+              searchResults!.length ? (
+                <div className="grid grid-cols-16 gap-1.5 max-lg:grid-cols-14 max-md:grid-cols-12 max-sm:grid-cols-10">
+                  {searchResults!.map((option) => (
+                    <button
+                      key={option.emoji}
+                      type="button"
+                      className={cx(
+                        "grid aspect-square min-h-11 cursor-pointer place-items-center rounded-sm border border-transparent text-2xl transition hover:border-(--accent-border) hover:bg-(--surface-raise)",
+                        emoji === option.emoji &&
+                          "border-(--accent) bg-(--accent-bg) shadow-[0_0_0_3px_var(--accent-bg)]",
+                      )}
+                      style={emojiStyle}
+                      aria-label={option.name}
+                      aria-pressed={emoji === option.emoji}
+                      title={option.name}
+                      onClick={() => setEmoji(option.emoji)}
+                    >
+                      {option.emoji}
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <p className="py-6 m-0 text-center text-sm text-(--text-faint)">
+                  {t("editor.noResults")}
+                </p>
+              )
+            ) : (
+              EMOJI_GROUPS.find((group) => group.label === activeGroup)!.subgroups.map(
+                (subgroup) => (
+                  <section key={subgroup.label} className="mb-3 last:mb-0">
+                    <h3 className="m-0 mb-1.5 font-mono text-[11px] font-semibold uppercase tracking-widest text-(--text-faint)">
+                      {subgroup.label}
+                    </h3>
+                    <div className="grid grid-cols-16 gap-1.5 max-lg:grid-cols-14 max-md:grid-cols-12 max-sm:grid-cols-10">
+                      {subgroup.emojis.map((option) => (
+                        <button
+                          key={option.emoji}
+                          type="button"
+                          className={cx(
+                            "grid aspect-square min-h-11 cursor-pointer place-items-center rounded-sm border border-transparent text-2xl transition hover:border-(--accent-border) hover:bg-(--surface-raise)",
+                            emoji === option.emoji &&
+                              "border-(--accent) bg-(--accent-bg) shadow-[0_0_0_3px_var(--accent-bg)]",
+                          )}
+                          style={emojiStyle}
+                          aria-label={option.name}
+                          aria-pressed={emoji === option.emoji}
+                          title={option.name}
+                          onClick={() => setEmoji(option.emoji)}
+                        >
+                          {option.emoji}
+                        </button>
+                      ))}
+                    </div>
+                  </section>
+                ),
+              )
             )}
           </div>
         </div>

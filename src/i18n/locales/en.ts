@@ -55,6 +55,9 @@ export const en = {
   "editor.name": "Name",
   "editor.namePlaceholder": "Sound name",
   "editor.emoji": "Emoji",
+  "editor.searchPlaceholder": "Search emojis…",
+  "editor.searchAria": "Search emojis",
+  "editor.noResults": "No emojis found",
   "editor.cancel": "Cancel",
   "editor.save": "Save",
 

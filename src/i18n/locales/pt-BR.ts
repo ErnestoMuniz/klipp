@@ -57,6 +57,9 @@ export const ptBR: Messages = {
   "editor.name": "Nome",
   "editor.namePlaceholder": "Nome do áudio",
   "editor.emoji": "Emoji",
+  "editor.searchPlaceholder": "Pesquisar emojis…",
+  "editor.searchAria": "Pesquisar emojis",
+  "editor.noResults": "Nenhum emoji encontrado",
   "editor.cancel": "Cancelar",
   "editor.save": "Salvar",
 
