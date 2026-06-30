@@ -44,6 +44,17 @@ export interface AudioApi {
   updateSoundMetadata: (url: string, metadata: SoundMetadata) => Promise<AudioState>;
 }
 
+export interface ShortcutApplyResult {
+  shortcut: string;
+  registered: boolean;
+  error?: "invalid" | "taken";
+}
+
+export interface ShortcutApi {
+  get: () => Promise<string>;
+  set: (accelerator: string) => Promise<ShortcutApplyResult>;
+}
+
 export interface IpcRendererApi {
   on: (channel: string, listener: (event: unknown, ...args: unknown[]) => void) => void;
   off: (channel: string, ...args: unknown[]) => void;
@@ -69,6 +80,7 @@ declare global {
     audio?: AudioApi;
     ipcRenderer?: IpcRendererApi;
     overlay?: OverlayApi;
+    shortcut?: ShortcutApi;
     windowControls?: WindowControlsApi;
   }
 }

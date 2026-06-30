@@ -14,6 +14,13 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { uIOhook, UiohookKey, type UiohookKeyboardEvent } from "uiohook-napi";
 import { AudioManager, registerAudioIpc, registerSoundProtocol, SOUND_SCHEME } from "./audio";
+import {
+  DEFAULT_SHORTCUT,
+  loadStoredShortcut,
+  parseAccelerator,
+  registerShortcutIpc,
+  type ParsedAccelerator,
+} from "./shortcut";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -46,7 +53,11 @@ process.env.VITE_PUBLIC = VITE_DEV_SERVER_URL
 
 process.env.PULSE_SINK = "soundboard-clips";
 
-const GLOBAL_SHORTCUT = "Alt+Shift+S";
+// Currently bound global shortcut. Loaded from disk on startup and updated
+// whenever a renderer rebind succeeds. The uIOhook listeners read
+// `currentParsed` on every event so they always reflect the live binding.
+let currentShortcut = DEFAULT_SHORTCUT;
+let currentParsed: ParsedAccelerator | null = parseAccelerator(DEFAULT_SHORTCUT);
 
 // ============================================================================
 // ESTADO GLOBAL
@@ -351,48 +362,102 @@ function registerOverlayIpc(): void {
 // ATALHO GLOBAL
 // ============================================================================
 
-function isShortcutKey(event: UiohookKeyboardEvent): boolean {
-  return event.keycode === UiohookKey.S;
-}
-
-function isShortcutModifier(event: UiohookKeyboardEvent): boolean {
+function matchesModifiers(event: UiohookKeyboardEvent, parsed: ParsedAccelerator): boolean {
   return (
-    event.keycode === UiohookKey.Alt ||
-    event.keycode === UiohookKey.AltRight ||
-    event.keycode === UiohookKey.Shift ||
-    event.keycode === UiohookKey.ShiftRight
+    event.altKey === parsed.alt &&
+    event.shiftKey === parsed.shift &&
+    event.ctrlKey === parsed.ctrl &&
+    event.metaKey === parsed.meta
   );
 }
 
-function registerShortcut(): void {
-  const registered = globalShortcut.register(GLOBAL_SHORTCUT, () => {
+function isShortcutModifierKey(event: UiohookKeyboardEvent, parsed: ParsedAccelerator): boolean {
+  if (parsed.alt && (event.keycode === UiohookKey.Alt || event.keycode === UiohookKey.AltRight)) {
+    return true;
+  }
+  if (
+    parsed.shift &&
+    (event.keycode === UiohookKey.Shift || event.keycode === UiohookKey.ShiftRight)
+  ) {
+    return true;
+  }
+  if (
+    parsed.ctrl &&
+    (event.keycode === UiohookKey.Ctrl || event.keycode === UiohookKey.CtrlRight)
+  ) {
+    return true;
+  }
+  if (
+    parsed.meta &&
+    (event.keycode === UiohookKey.Meta || event.keycode === UiohookKey.MetaRight)
+  ) {
+    return true;
+  }
+  return false;
+}
+
+/**
+ * Apply a new accelerator as the active global shortcut. Registers the
+ * Electron global accelerator and updates the parsed state the uIOhook
+ * listeners read. On failure the previous binding is restored so the overlay
+ * keeps working.
+ */
+function applyShortcut(accelerator: string): {
+  shortcut: string;
+  registered: boolean;
+  error?: "invalid" | "taken";
+} {
+  const parsed = parseAccelerator(accelerator);
+  if (!parsed) return { shortcut: currentShortcut, registered: false, error: "invalid" };
+
+  globalShortcut.unregisterAll();
+  const registered = globalShortcut.register(accelerator, () => {
     shortcutHeld = true;
     showOverlay();
   });
 
   if (!registered) {
-    console.error(`Não foi possível registrar o atalho global ${GLOBAL_SHORTCUT}.`);
+    // Restore the previous binding so the overlay stays usable.
+    globalShortcut.register(currentShortcut, () => {
+      shortcutHeld = true;
+      showOverlay();
+    });
+    return { shortcut: currentShortcut, registered: false, error: "taken" };
+  }
+
+  currentShortcut = accelerator;
+  currentParsed = parsed;
+  return { shortcut: accelerator, registered: true };
+}
+
+function registerShortcut(): void {
+  const registered = globalShortcut.register(currentShortcut, () => {
+    shortcutHeld = true;
+    showOverlay();
+  });
+
+  if (!registered) {
+    console.error(`Não foi possível registrar o atalho global ${currentShortcut}.`);
   }
 
   uIOhook.on("keydown", (event) => {
-    if (shortcutHeld || !isShortcutKey(event) || !event.altKey || !event.shiftKey) return;
+    if (shortcutHeld || !currentParsed) return;
+    if (!matchesModifiers(event, currentParsed) || event.keycode !== currentParsed.key) return;
     shortcutHeld = true;
     showOverlay();
   });
 
   uIOhook.on("keyup", (event) => {
-    if (
-      !shortcutHeld ||
-      (!isShortcutKey(event) && !isShortcutModifier(event) && event.altKey && event.shiftKey)
-    ) {
+    if (!shortcutHeld || !currentParsed) return;
+    if (event.keycode !== currentParsed.key && !isShortcutModifierKey(event, currentParsed)) {
       return;
     }
-
     shortcutHeld = false;
     confirmOverlaySelection();
   });
 
   uIOhook.start();
+  registerShortcutIpc({ getCurrent: () => currentShortcut, onApply: applyShortcut });
 }
 
 // ============================================================================
@@ -447,6 +512,11 @@ app.setName("klipp");
 void app.whenReady().then(async () => {
   // No application menu, no visible menu bar — the UI owns all chrome.
   Menu.setApplicationMenu(null);
+
+  // Load the persisted global shortcut before wiring up its listeners so the
+  // first registration uses the user's chosen binding.
+  currentShortcut = await loadStoredShortcut();
+  currentParsed = parseAccelerator(currentShortcut);
 
   registerSoundProtocol();
   await audio.init();

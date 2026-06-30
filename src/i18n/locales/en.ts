@@ -51,7 +51,7 @@ export const en = {
   "editor.title": "Edit sound",
   "editor.closeAria": "Close",
   "editor.overlayGroup": "In quick picker (overlay)",
-  "editor.overlayLabel": "Available in the quick picker (Alt+Shift+S shortcut)",
+  "editor.overlayLabel": "Available in the quick picker (global shortcut)",
   "editor.name": "Name",
   "editor.namePlaceholder": "Sound name",
   "editor.emoji": "Emoji",
@@ -96,6 +96,12 @@ export const en = {
   "settings.discordTo": "to",
   "settings.globalShortcutHint":
     "Global shortcut {shortcut} opens the quick picker · {esc} closes.",
+  "settings.shortcutGroup": "Global shortcut",
+  "settings.shortcutRecordAria": "Record a new shortcut",
+  "settings.shortcutRecording": "Press a key combination…",
+  "settings.shortcutReset": "Reset to default",
+  "settings.shortcutTaken": "That shortcut couldn't be registered. Try another combination.",
+  "settings.shortcutInvalid": "That key combination isn't supported.",
 
   "settings.languageGroup": "Language",
   "settings.languageSystem": "System",

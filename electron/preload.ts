@@ -31,6 +31,11 @@ contextBridge.exposeInMainWorld("audio", {
     ipcRenderer.invoke("audio:update-sound-metadata", url, metadata),
 });
 
+contextBridge.exposeInMainWorld("shortcut", {
+  get: () => ipcRenderer.invoke("shortcut:get"),
+  set: (accelerator: string) => ipcRenderer.invoke("shortcut:set", accelerator),
+});
+
 contextBridge.exposeInMainWorld("windowControls", {
   minimize: () => ipcRenderer.send("window:minimize"),
   toggleMaximize: () => ipcRenderer.send("window:toggle-maximize"),

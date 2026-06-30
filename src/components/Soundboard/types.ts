@@ -8,7 +8,7 @@ export type Theme = "light" | "dark" | "system";
 /** Library-level view filter. "overlay" filters to sounds in the quick picker. */
 export type ViewFilter = "all" | "overlay";
 
-export const GLOBAL_SHORTCUT = "Alt+Shift+S";
+export const DEFAULT_SHORTCUT = "Alt+Shift+S";
 export const PREFS_KEY = "klipp.prefs.v1";
 
 export interface Prefs {

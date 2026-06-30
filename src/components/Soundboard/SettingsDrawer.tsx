@@ -1,7 +1,8 @@
 import { Globe, Moon, Sun, SunMoon, X } from "lucide-react";
 import type { AudioState } from "../../audio-globals";
-import { GLOBAL_SHORTCUT } from "./types";
+import { DEFAULT_SHORTCUT } from "./types";
 import type { Theme } from "./types";
+import { ShortcutRecorder } from "./ShortcutRecorder";
 import { cx, dividerClass } from "./styles";
 import { Button, FieldGroup, Select, Switch } from "./ui";
 import { useI18n } from "../../i18n";
@@ -12,11 +13,13 @@ interface SettingsDrawerProps {
   open: boolean;
   state: AudioState;
   theme: Theme;
+  shortcut: string;
   onClose: () => void;
   onHearClips: (enabled: boolean) => void;
   onMicPassthrough: (enabled: boolean) => void;
   onMicSource: (name: string) => void;
   onThemeChange: (theme: Theme) => void;
+  onShortcutChange: (accelerator: string) => Promise<{ registered: boolean; error?: string }>;
 }
 
 export function SettingsDrawer({
@@ -24,11 +27,13 @@ export function SettingsDrawer({
   open,
   state,
   theme,
+  shortcut,
   onClose,
   onHearClips,
   onMicPassthrough,
   onMicSource,
   onThemeChange,
+  onShortcutChange,
 }: SettingsDrawerProps) {
   const { t, language, setLanguage } = useI18n();
 
@@ -149,6 +154,23 @@ export function SettingsDrawer({
 
           <div className={dividerClass} />
 
+          <FieldGroup label={t("settings.shortcutGroup")}>
+            <ShortcutRecorder
+              disabled={disabled}
+              shortcut={shortcut}
+              defaultValue={DEFAULT_SHORTCUT}
+              onChange={onShortcutChange}
+            />
+            <p className="text-sm leading-normal text-(--text)">
+              {t("settings.globalShortcutHint", {
+                shortcut,
+                esc: "Esc",
+              })}
+            </p>
+          </FieldGroup>
+
+          <div className={dividerClass} />
+
           <div className="flex flex-col gap-2">
             <FieldGroup label={t("settings.discordGroup")}>
               <p className="text-sm leading-normal text-(--text)">
@@ -156,12 +178,6 @@ export function SettingsDrawer({
                 <strong className="text-(--text-h)">{t("settings.discordInputDevice")}</strong>{" "}
                 {t("settings.discordTo")} <code className="text-xs">{state.discordDeviceName}</code>
                 .
-              </p>
-              <p className="text-sm leading-normal text-(--text)">
-                {t("settings.globalShortcutHint", {
-                  shortcut: GLOBAL_SHORTCUT,
-                  esc: "Esc",
-                })}
               </p>
             </FieldGroup>
           </div>

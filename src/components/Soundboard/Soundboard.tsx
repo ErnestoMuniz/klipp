@@ -16,6 +16,7 @@ import { PREFS_KEY, emptyState, loadPrefs, soundLabel } from "./types";
 import type { Prefs, Status, Theme } from "./types";
 import { applyTheme } from "./theme";
 import { useI18n } from "../../i18n";
+import { useShortcut } from "./useShortcut";
 
 function Soundboard() {
   const { t } = useI18n();
@@ -34,6 +35,7 @@ function Soundboard() {
   const playbackIdRef = useRef(0);
 
   const api: AudioApi | undefined = window.audio;
+  const { shortcut, set: setShortcut } = useShortcut();
 
   useEffect(() => {
     try {
@@ -294,7 +296,7 @@ function Soundboard() {
         onSettingsToggle={() => setSettingsOpen((value) => !value)}
       />
 
-      {prefs.showHints && soundCount > 0 && <ShortcutBanner />}
+      {prefs.showHints && soundCount > 0 && <ShortcutBanner shortcut={shortcut} />}
 
       <SoundStage
         density={prefs.density}
@@ -321,11 +323,13 @@ function Soundboard() {
         open={settingsOpen}
         state={soundboardState}
         theme={theme}
+        shortcut={shortcut}
         onClose={() => setSettingsOpen(false)}
         onHearClips={(enabled) => void onHearClips(enabled)}
         onMicPassthrough={(enabled) => void onMicPassthrough(enabled)}
         onMicSource={(name) => void onMicSource(name)}
         onThemeChange={setTheme}
+        onShortcutChange={setShortcut}
       />
 
       <TransportBar
