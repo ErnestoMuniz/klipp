@@ -17,6 +17,7 @@ import type { Prefs, Status, Theme } from "./types";
 import { applyTheme } from "./theme";
 import { useI18n } from "../../i18n";
 import { useShortcut } from "./useShortcut";
+import { useAppSettings } from "./useAppSettings";
 
 function Soundboard() {
   const { t } = useI18n();
@@ -36,6 +37,7 @@ function Soundboard() {
 
   const api: AudioApi | undefined = window.audio;
   const { shortcut, set: setShortcut } = useShortcut();
+  const { settings: appSettings, set: setAppSettings } = useAppSettings();
 
   useEffect(() => {
     try {
@@ -324,12 +326,14 @@ function Soundboard() {
         state={soundboardState}
         theme={theme}
         shortcut={shortcut}
+        runInBackground={appSettings.runInBackground}
         onClose={() => setSettingsOpen(false)}
         onHearClips={(enabled) => void onHearClips(enabled)}
         onMicPassthrough={(enabled) => void onMicPassthrough(enabled)}
         onMicSource={(name) => void onMicSource(name)}
         onThemeChange={setTheme}
         onShortcutChange={setShortcut}
+        onRunInBackgroundChange={(enabled) => void setAppSettings({ runInBackground: enabled })}
       />
 
       <TransportBar

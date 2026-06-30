@@ -14,12 +14,14 @@ interface SettingsDrawerProps {
   state: AudioState;
   theme: Theme;
   shortcut: string;
+  runInBackground: boolean;
   onClose: () => void;
   onHearClips: (enabled: boolean) => void;
   onMicPassthrough: (enabled: boolean) => void;
   onMicSource: (name: string) => void;
   onThemeChange: (theme: Theme) => void;
   onShortcutChange: (accelerator: string) => Promise<{ registered: boolean; error?: string }>;
+  onRunInBackgroundChange: (enabled: boolean) => void;
 }
 
 export function SettingsDrawer({
@@ -28,12 +30,14 @@ export function SettingsDrawer({
   state,
   theme,
   shortcut,
+  runInBackground,
   onClose,
   onHearClips,
   onMicPassthrough,
   onMicSource,
   onThemeChange,
   onShortcutChange,
+  onRunInBackgroundChange,
 }: SettingsDrawerProps) {
   const { t, language, setLanguage } = useI18n();
 
@@ -150,6 +154,18 @@ export function SettingsDrawer({
                 ))}
               </Select>
             </div>
+          </FieldGroup>
+
+          <div className={dividerClass} />
+
+          <FieldGroup label={t("settings.backgroundGroup")}>
+            <Switch
+              checked={runInBackground}
+              disabled={disabled}
+              label={t("settings.backgroundLabel")}
+              onChange={(event) => onRunInBackgroundChange(event.target.checked)}
+            />
+            <p className="text-sm leading-normal text-(--text)">{t("settings.backgroundHint")}</p>
           </FieldGroup>
 
           <div className={dividerClass} />

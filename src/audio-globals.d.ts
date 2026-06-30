@@ -55,6 +55,16 @@ export interface ShortcutApi {
   set: (accelerator: string) => Promise<ShortcutApplyResult>;
 }
 
+export interface AppSettings {
+  /** When true, closing the main window hides it; when false, the app quits. */
+  runInBackground: boolean;
+}
+
+export interface AppSettingsApi {
+  get: () => Promise<AppSettings>;
+  set: (patch: Partial<AppSettings>) => Promise<AppSettings>;
+}
+
 export interface IpcRendererApi {
   on: (channel: string, listener: (event: unknown, ...args: unknown[]) => void) => void;
   off: (channel: string, ...args: unknown[]) => void;
@@ -81,6 +91,7 @@ declare global {
     ipcRenderer?: IpcRendererApi;
     overlay?: OverlayApi;
     shortcut?: ShortcutApi;
+    appSettings?: AppSettingsApi;
     windowControls?: WindowControlsApi;
   }
 }

@@ -21,6 +21,12 @@ import {
   registerShortcutIpc,
   type ParsedAccelerator,
 } from "./shortcut";
+import {
+  DEFAULT_SETTINGS,
+  loadAppSettings,
+  registerSettingsIpc,
+  type AppSettings,
+} from "./appSettings";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -71,6 +77,11 @@ let isQuitting = false;
 let shortcutHeld = false;
 let overlayActive = false;
 let activeOverlayDisplayId: number | null = null;
+
+// App-level preferences that the main process acts on. Loaded from disk on
+// startup and updated live whenever the renderer changes them; the close
+// handler reads `runInBackground` to decide whether to hide or quit.
+let currentSettings: AppSettings = DEFAULT_SETTINGS;
 
 interface OverlayView {
   displayId: number;
@@ -124,10 +135,17 @@ function createWindow(): void {
   win.setMenuBarVisibility(false);
 
   win.on("close", (event) => {
-    if (!isQuitting) {
+    if (isQuitting) return;
+    if (currentSettings.runInBackground) {
       event.preventDefault();
       win?.hide();
+      return;
     }
+    // Background execution disabled: quit the whole app. Mark quitting so
+    // the tray/overlay teardown doesn't fight the shutdown and `before-quit`
+    // runs the cleanup pipeline (audio, shortcuts, hooks, overlays).
+    isQuitting = true;
+    app.quit();
   });
 
   win.on("maximize", () => win?.webContents.send("window:maximized", true));
@@ -518,9 +536,19 @@ void app.whenReady().then(async () => {
   currentShortcut = await loadStoredShortcut();
   currentParsed = parseAccelerator(currentShortcut);
 
+  // Load app-level preferences before creating windows so the close handler
+  // already reflects the user's "run in background" choice on first close.
+  currentSettings = await loadAppSettings();
+
   registerSoundProtocol();
   await audio.init();
   registerAudioIpc(audio);
+  registerSettingsIpc({
+    getCurrent: () => currentSettings,
+    onApply: (next) => {
+      currentSettings = next;
+    },
+  });
   createWindow();
   syncOverlays();
   screen.on("display-added", (_event, display) => createOverlay(display));

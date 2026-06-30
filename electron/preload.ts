@@ -36,6 +36,11 @@ contextBridge.exposeInMainWorld("shortcut", {
   set: (accelerator: string) => ipcRenderer.invoke("shortcut:set", accelerator),
 });
 
+contextBridge.exposeInMainWorld("appSettings", {
+  get: () => ipcRenderer.invoke("app-settings:get"),
+  set: (patch: Record<string, unknown>) => ipcRenderer.invoke("app-settings:set", patch),
+});
+
 contextBridge.exposeInMainWorld("windowControls", {
   minimize: () => ipcRenderer.send("window:minimize"),
   toggleMaximize: () => ipcRenderer.send("window:toggle-maximize"),

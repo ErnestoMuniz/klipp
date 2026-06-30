@@ -87,6 +87,10 @@ export const en = {
   "settings.micLabel": "Microphone",
   "settings.micNone": "No microphone found",
   "settings.monitoringGroup": "Monitoring",
+  "settings.backgroundGroup": "Background",
+  "settings.backgroundLabel": "Keep running in the background when the window is closed",
+  "settings.backgroundHint":
+    "When off, closing the main window quits Klipp instead of hiding it to the tray.",
   "settings.hearClipsLabel":
     "Hear the sounds in my headphones/speakers (just the sounds, not my voice)",
   "settings.themeGroup": "Theme",

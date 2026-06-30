@@ -89,6 +89,10 @@ export const ptBR: Messages = {
   "settings.micLabel": "Microfone",
   "settings.micNone": "Nenhum microfone encontrado",
   "settings.monitoringGroup": "Monitorização",
+  "settings.backgroundGroup": "Segundo plano",
+  "settings.backgroundLabel": "Manter em execução em segundo plano ao fechar a janela",
+  "settings.backgroundHint":
+    "Quando desativado, fechar a janela principal encerra o Klipp em vez de o esconder para a bandeja.",
   "settings.hearClipsLabel":
     "Ouvir os áudios nos meus fones/caixas (só os áudios, sem a minha voz)",
   "settings.themeGroup": "Tema",
