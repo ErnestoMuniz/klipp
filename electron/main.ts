@@ -14,6 +14,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { uIOhook, UiohookKey, type UiohookKeyboardEvent } from "uiohook-napi";
 import { AudioManager, registerAudioIpc, registerSoundProtocol, SOUND_SCHEME } from "./audio";
+import { searchMyinstants } from "./myinstants";
 import {
   DEFAULT_SHORTCUT,
   loadStoredShortcut,
@@ -543,6 +544,12 @@ void app.whenReady().then(async () => {
   registerSoundProtocol();
   await audio.init();
   registerAudioIpc(audio);
+
+  // Renderer side of myinstants browse: forward searches to the scraper. Done
+  // in the main process so the renderer avoids CORS and HTML parsing noise.
+  ipcMain.handle("myinstants:search", async (_event, query: string, page?: number) =>
+    searchMyinstants(query, page ?? 1),
+  );
   registerSettingsIpc({
     getCurrent: () => currentSettings,
     onApply: (next) => {

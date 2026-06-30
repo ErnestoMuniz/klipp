@@ -24,6 +24,8 @@ export const ptBR: Messages = {
   "toolbar.sortRecent": "Recentes",
   "toolbar.overlayOnlyAria": "Só do seletor",
   "toolbar.overlayOnlyTitle": "Mostrar apenas os áudios do seletor rápido",
+  "toolbar.browseOnlineAria": "Pesquisar áudios online",
+  "toolbar.browseOnlineTitle": "Pesquisar e baixar áudios do myinstants.com",
   "toolbar.hideHints": "Ocultar dicas",
   "toolbar.showHints": "Mostrar dicas",
   "toolbar.settingsAria": "Definições",
@@ -115,4 +117,19 @@ export const ptBR: Messages = {
   "settings.languageSystem": "Sistema",
   "settings.languageEn": "English",
   "settings.languagePtBR": "Português (Brasil)",
+
+  "online.title": "Pesquisar áudios online",
+  "online.closeAria": "Fechar busca online",
+  "online.searchPlaceholder": "Pesquisar no myinstants.com…",
+  "online.searchAria": "Pesquisar no myinstants.com",
+  "online.attribution": "Resultados da busca do myinstants.com.",
+  "online.hint":
+    "Digite um nome e prima Enter para pesquisar no myinstants.com; depois ouça e baixe os áudios para a sua biblioteca.",
+  "online.preview": "Ouvir",
+  "online.pause": "Parar prévia",
+  "online.download": "Baixar para a biblioteca",
+  "online.downloaded": "Adicionado à biblioteca",
+  "online.loadMore": "Carregar mais",
+  "online.searching": "A pesquisar…",
+  "online.endOfResults": "Fim dos resultados",
 };

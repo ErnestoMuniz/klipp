@@ -22,6 +22,8 @@ export const en = {
   "toolbar.sortRecent": "Recent",
   "toolbar.overlayOnlyAria": "Picker only",
   "toolbar.overlayOnlyTitle": "Show only quick-picker sounds",
+  "toolbar.browseOnlineAria": "Browse sounds online",
+  "toolbar.browseOnlineTitle": "Browse and download sounds from myinstants.com",
   "toolbar.hideHints": "Hide hints",
   "toolbar.showHints": "Show hints",
   "toolbar.settingsAria": "Settings",
@@ -114,6 +116,21 @@ export const en = {
   "settings.languageSystem": "System",
   "settings.languageEn": "English",
   "settings.languagePtBR": "Português (Brasil)",
+
+  "online.title": "Browse sounds online",
+  "online.closeAria": "Close online sounds",
+  "online.searchPlaceholder": "Search myinstants.com…",
+  "online.searchAria": "Search myinstants.com",
+  "online.attribution": "Search results come from myinstants.com.",
+  "online.hint":
+    "Type a name and press Enter to search myinstants.com, then preview and download sounds to your library.",
+  "online.preview": "Preview",
+  "online.pause": "Stop preview",
+  "online.download": "Download to library",
+  "online.downloaded": "Added to your library",
+  "online.loadMore": "Load more",
+  "online.searching": "Searching…",
+  "online.endOfResults": "End of results",
 } as const;
 
 export type TranslationKey = keyof typeof en;

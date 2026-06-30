@@ -1,4 +1,14 @@
-import { LayoutGrid, Lightbulb, Music, Rows3, Search, Settings, Star, X } from "lucide-react";
+import {
+  Cloud,
+  LayoutGrid,
+  Lightbulb,
+  Music,
+  Rows3,
+  Search,
+  Settings,
+  Star,
+  X,
+} from "lucide-react";
 import type { Density, Prefs, SortMode } from "./types";
 import { cx } from "./styles";
 import { Badge, Button, IconTile, Select } from "./ui";
@@ -8,11 +18,14 @@ interface LibraryToolbarProps {
   density: Density;
   prefs: Prefs;
   query: string;
+  /** Whether the online sounds drawer is open (highlights the browse button). */
+  onlineOpen: boolean;
   settingsOpen: boolean;
   soundCount: number;
   visibleCount: number;
   onPrefsChange: (updater: (prefs: Prefs) => Prefs) => void;
   onQueryChange: (query: string) => void;
+  onOnlineToggle: () => void;
   onSettingsToggle: () => void;
 }
 
@@ -20,11 +33,13 @@ export function LibraryToolbar({
   density,
   prefs,
   query,
+  onlineOpen,
   settingsOpen,
   soundCount,
   visibleCount,
   onPrefsChange,
   onQueryChange,
+  onOnlineToggle,
   onSettingsToggle,
 }: LibraryToolbarProps) {
   const { t } = useI18n();
@@ -115,6 +130,17 @@ export function LibraryToolbar({
           title={t("toolbar.overlayOnlyTitle")}
         >
           <Star size={18} aria-hidden="true" />
+        </Button>
+
+        <Button
+          variant="ghost"
+          className={cx("size-10 p-0", onlineOpen && "text-(--accent)")}
+          onClick={onOnlineToggle}
+          aria-pressed={onlineOpen}
+          aria-label={t("toolbar.browseOnlineAria")}
+          title={t("toolbar.browseOnlineTitle")}
+        >
+          <Cloud size={18} aria-hidden="true" />
         </Button>
 
         <Button

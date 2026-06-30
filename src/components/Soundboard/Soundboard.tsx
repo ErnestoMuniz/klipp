@@ -9,6 +9,7 @@ import { ShortcutBanner } from "./ShortcutBanner";
 import { SoundEditor } from "./SoundEditor";
 import { SoundStage } from "./SoundStage";
 import { Topbar } from "./Topbar";
+import { OnlineSounds } from "./OnlineSounds";
 import { TransportBar } from "./TransportBar";
 import { Button } from "./ui";
 import { cx } from "./styles";
@@ -30,6 +31,7 @@ function Soundboard() {
   const [theme, setTheme] = useState<Theme>(prefs.theme);
   const [fatal, setFatal] = useState<string | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [onlineOpen, setOnlineOpen] = useState(false);
   const [editingSound, setEditingSound] = useState<SoundFile | null>(null);
   const [query, setQuery] = useState("");
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -290,11 +292,13 @@ function Soundboard() {
         density={prefs.density}
         prefs={prefs}
         query={query}
+        onlineOpen={onlineOpen}
         settingsOpen={settingsOpen}
         soundCount={soundCount}
         visibleCount={visibleCount}
         onPrefsChange={setPrefs}
         onQueryChange={setQuery}
+        onOnlineToggle={() => setOnlineOpen((value) => !value)}
         onSettingsToggle={() => setSettingsOpen((value) => !value)}
       />
 
@@ -318,6 +322,12 @@ function Soundboard() {
         sound={editingSound}
         onClose={() => setEditingSound(null)}
         onSave={(sound, metadata) => void onSaveSoundMetadata(sound, metadata)}
+      />
+
+      <OnlineSounds
+        open={onlineOpen}
+        onLibraryChanged={setState}
+        onClose={() => setOnlineOpen(false)}
       />
 
       <SettingsDrawer

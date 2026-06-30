@@ -47,6 +47,12 @@ contextBridge.exposeInMainWorld("windowControls", {
   close: () => ipcRenderer.send("window:close"),
 });
 
+contextBridge.exposeInMainWorld("soundsBrowser", {
+  search: (query: string, page?: number) => ipcRenderer.invoke("myinstants:search", query, page),
+  download: (sound: { url: string; file: string; title?: string }) =>
+    ipcRenderer.invoke("audio:install-remote-sound", sound),
+});
+
 contextBridge.exposeInMainWorld("overlay", {
   hide: () => ipcRenderer.send("overlay:hide"),
   pointerReady: () => ipcRenderer.send("overlay:pointer-ready"),

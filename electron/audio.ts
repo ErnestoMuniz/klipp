@@ -4,6 +4,24 @@ import fs from "node:fs/promises";
 import { createReadStream } from "node:fs";
 import path from "node:path";
 import { Readable } from "node:stream";
+import { MYINSTANTS_USER_AGENT } from "./myinstants";
+
+/** Sound descriptor from myinstants search results, used for one-click import. */
+export interface RemoteSoundImport {
+  url: string;
+  file: string;
+  title?: string;
+}
+
+/** Returns true if the target path exists (file or directory), false otherwise. */
+async function fileExists(target: string): Promise<boolean> {
+  try {
+    await fs.access(target);
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 // ---------------------------------------------------------------------------
 // Persistent settings
@@ -483,6 +501,63 @@ export class AudioManager {
     return this.getState();
   }
 
+  /**
+   * Import a sound from myinstants (or any URL): download its bytes into the
+   * userData sounds directory, persist a friendly display name from the
+   * search result, then refresh the loaded sounds list.
+   *
+   * @returns the refreshed AudioState (no-op shape if anything went wrong).
+   */
+  async installRemoteSound(sound: RemoteSoundImport): Promise<AudioState> {
+    // Validate the requested filename before touching the filesystem.
+    const file = sound.file?.trim();
+    if (!file || file.includes("/") || file.includes("\\")) {
+      throw new Error("Invalid sound filename");
+    }
+    if (!sound.url) throw new Error("Missing sound URL");
+
+    const dir = this.soundsDir();
+    await fs.mkdir(dir, { recursive: true });
+
+    // If the extension isn't a known audio type, fall back to .mp3 (myinstants
+    // media is mp3 anyway, but a stray .txt URL shouldn't crash listSounds).
+    const ext = path.extname(file).slice(1).toLowerCase();
+    const candidate = ext && AUDIO_EXTS.has(ext) ? file : `${file}.mp3`;
+
+    // Pick a filename that doesn't collide with an existing one.
+    let unique = candidate;
+    let attempt = 1;
+    const known = new Set(this.sounds.map((entry) => entry.name));
+    while (known.has(unique) || (await fileExists(path.join(dir, unique)))) {
+      const candidateExt = path.extname(candidate);
+      const candidateBase = path.basename(candidate, candidateExt);
+      unique = `${candidateBase}-${attempt}${candidateExt}`;
+      attempt += 1;
+    }
+
+    // Download bytes. A 4xx/5xx surfaces as a thrown Error to the renderer.
+    const response = await fetch(sound.url, {
+      headers: { "User-Agent": MYINSTANTS_USER_AGENT, Accept: "audio/*,*/*;q=0.1" },
+      redirect: "follow",
+    });
+    if (!response.ok) throw new Error(`Download failed (status ${response.status})`);
+    const body = await response.arrayBuffer();
+    if (body.byteLength === 0) throw new Error("Downloaded file is empty");
+    await fs.writeFile(path.join(dir, unique), Buffer.from(body));
+
+    const title =
+      typeof sound.title === "string" && sound.title.trim()
+        ? sound.title.trim()
+        : path.basename(unique, path.extname(unique));
+    this.soundMetadata = {
+      ...this.soundMetadata,
+      [unique]: { displayName: title, emoji: "♪", inOverlay: true },
+    };
+    await saveSoundMetadata(this.soundMetadata);
+    this.sounds = await this.listSounds();
+    return this.getState();
+  }
+
   /** Sounds the quick overlay picker may show (those opted into the overlay). */
   overlaySounds(): SoundFile[] {
     return this.sounds.filter((sound) => sound.inOverlay);
@@ -594,6 +669,9 @@ export function registerAudioIpc(manager: AudioManager): void {
   );
   ipcMain.handle("audio:add-sounds", async () => manager.addSounds());
   ipcMain.handle("audio:relist-sounds", async () => manager.relistSounds());
+  ipcMain.handle("audio:install-remote-sound", async (_event, sound: RemoteSoundImport) =>
+    manager.installRemoteSound(sound),
+  );
   ipcMain.handle(
     "audio:update-sound-metadata",
     async (_event, url: string, metadata: SoundMetadata) =>

@@ -78,6 +78,36 @@ export interface WindowControlsApi {
   close: () => void;
 }
 
+export interface RemoteSound {
+  /** Numeric myinstants instant id (the `favorite(...)` argument). */
+  id: string;
+  /** Title as shown on the myinstants page, decoded + trimmed. */
+  title: string;
+  /** Page slug (/en/instant/<slug>/). */
+  slug: string;
+  /** `/media/sounds/<filename>` path on myinstants. */
+  path: string;
+  /** Bare media filename, e.g. `dry-fart.mp3`. */
+  file: string;
+  /** Absolute URL the renderer can hand to `new Audio(url)` for previewing. */
+  url: string;
+}
+
+export interface SearchPage {
+  results: RemoteSound[];
+  /** The page number that was requested. */
+  page: number;
+  /** Best-effort "has more" hint (a full-size page assumes more exist). */
+  hasMore: boolean;
+}
+
+export interface SoundsBrowserApi {
+  /** Query myinstants.com for instants matching `query`, page defaults to 1. */
+  search: (query: string, page?: number) => Promise<SearchPage>;
+  /** Download `sound` into the library, returning the refreshed AudioState. */
+  download: (sound: { url: string; file: string; title?: string }) => Promise<AudioState>;
+}
+
 export interface OverlayApi {
   hide: () => void;
   pointerReady: () => void;
@@ -93,5 +123,6 @@ declare global {
     shortcut?: ShortcutApi;
     appSettings?: AppSettingsApi;
     windowControls?: WindowControlsApi;
+    soundsBrowser?: SoundsBrowserApi;
   }
 }
