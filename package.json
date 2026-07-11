@@ -2,11 +2,14 @@
   "name": "klipp",
   "version": "1.0.0",
   "private": true,
+  "description": "Desktop soundboard with a quick overlay and virtual microphone routing.",
+  "author": "Ernesto Muniz",
   "type": "module",
   "main": "dist-electron/main.js",
   "scripts": {
     "dev": "vp dev",
     "build": "tsc -b && vp build",
+    "build:flatpak": "flatpak remote-add --user --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo && vp run build && mkdir -p release/.flatpak-tmp && TMPDIR=$PWD/release/.flatpak-tmp electron-builder --linux flatpak --x64",
     "lint": "vp lint .",
     "preview": "vp preview",
     "prepare": "vp config"
@@ -41,6 +44,40 @@
     }
   },
   "build": {
-    "icon": "public/logo.png"
-  }
+    "appId": "io.github.ErnestoMuniz.Klipp",
+    "productName": "Klipp",
+    "executableName": "klipp",
+    "npmRebuild": false,
+    "artifactName": "${productName}-${version}-${arch}.${ext}",
+    "directories": {
+      "output": "release"
+    },
+    "icon": "public/logo.png",
+    "linux": {
+      "category": "AudioVideo;Audio;Utility",
+      "icon": "build/icons",
+      "syncDesktopName": true
+    },
+    "flatpak": {
+      "runtime": "org.freedesktop.Platform",
+      "runtimeVersion": "24.08",
+      "sdk": "org.freedesktop.Sdk",
+      "base": "org.electronjs.Electron2.BaseApp",
+      "baseVersion": "24.08",
+      "finishArgs": [
+        "--share=network",
+        "--share=ipc",
+        "--socket=x11",
+        "--socket=wayland",
+        "--socket=pulseaudio",
+        "--device=dri",
+        "--device=all",
+        "--talk-name=org.freedesktop.Notifications",
+        "--talk-name=org.freedesktop.portal.GlobalShortcuts",
+        "--talk-name=org.kde.StatusNotifierWatcher",
+        "--talk-name=org.freedesktop.Flatpak"
+      ]
+    }
+  },
+  "desktopName": "io.github.ErnestoMuniz.Klipp"
 }

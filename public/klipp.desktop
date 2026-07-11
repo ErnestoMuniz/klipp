@@ -1,6 +1,6 @@
 [Desktop Entry]
 Name=Klipp
 Exec=klipp
-Icon=logo
+Icon=io.github.ErnestoMuniz.Klipp
 Type=Application
 Categories=Audio;Utility;

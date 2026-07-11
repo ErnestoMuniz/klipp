@@ -1,7 +1,6 @@
 import { app, ipcMain, BrowserWindow } from "electron";
 import fs from "node:fs/promises";
 import path from "node:path";
-import { UiohookKey } from "uiohook-napi";
 
 // ---------------------------------------------------------------------------
 // Global shortcut storage + parsing
@@ -30,9 +29,72 @@ const LETTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
 const DIGITS = "0123456789".split("");
 const FUNCTION_KEYS = Array.from({ length: 24 }, (_, index) => `F${index + 1}`);
 
-// UiohookKey is a plain `const` object keyed by friendly names; widen it so we
-// can look up codes by computed string names.
-const codes = UiohookKey as unknown as Record<string, number>;
+// Keep these key codes local instead of importing `uiohook-napi` here. That
+// package loads its native addon as soon as it is imported, which would make
+// an unavailable X11 input backend abort the main process before Electron can
+// create a window. The actual hook is loaded lazily (and guarded) in main.ts.
+const codes: Record<string, number> = {
+  0: 11,
+  1: 2,
+  2: 3,
+  3: 4,
+  4: 5,
+  5: 6,
+  6: 7,
+  7: 8,
+  8: 9,
+  9: 10,
+  A: 30,
+  B: 48,
+  C: 46,
+  D: 32,
+  E: 18,
+  F: 33,
+  G: 34,
+  H: 35,
+  I: 23,
+  J: 36,
+  K: 37,
+  L: 38,
+  M: 50,
+  N: 49,
+  O: 24,
+  P: 25,
+  Q: 16,
+  R: 19,
+  S: 31,
+  T: 20,
+  U: 22,
+  V: 47,
+  W: 17,
+  X: 45,
+  Y: 21,
+  Z: 44,
+  F1: 59,
+  F2: 60,
+  F3: 61,
+  F4: 62,
+  F5: 63,
+  F6: 64,
+  F7: 65,
+  F8: 66,
+  F9: 67,
+  F10: 68,
+  F11: 87,
+  F12: 88,
+  F13: 91,
+  F14: 92,
+  F15: 93,
+  F16: 99,
+  F17: 100,
+  F18: 101,
+  F19: 102,
+  F20: 103,
+  F21: 104,
+  F22: 105,
+  F23: 106,
+  F24: 107,
+};
 
 const KEY_MAP: Record<string, number> = {};
 for (const letter of LETTERS) KEY_MAP[letter] = codes[letter];

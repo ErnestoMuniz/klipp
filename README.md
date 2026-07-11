@@ -1,73 +1,84 @@
-# React + TypeScript + Vite
+# Klipp
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Klipp is a desktop soundboard with a quick-overlay selector, sound imports,
+and optional PipeWire/PulseAudio virtual microphone routing.
 
-Currently, two official plugins are available:
+## Build a local Flatpak installer
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+The Flatpak package is intentionally distributed outside Flathub. It is an
+`x86_64` installer with the stable application ID
+`io.github.ErnestoMuniz.Klipp`.
 
-## React Compiler
+### Prerequisites
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+- Linux on `x86_64`
+- Flatpak and `flatpak-builder`
+- Node.js and pnpm (the repository pins pnpm through Vite+)
+- The Flathub remote, used only to download the Electron/FreeDesktop runtimes
 
-## Expanding the ESLint configuration
+On Fedora, install the build prerequisites with:
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
-
-```js
-export default defineConfig([
-  globalIgnores(["dist"]),
-  {
-    files: ["**/*.{ts,tsx}"],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ["./tsconfig.node.json", "./tsconfig.app.json"],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-]);
+```sh
+sudo dnf install flatpak flatpak-builder
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+On Debian or Ubuntu, install them with:
 
-```js
-// eslint.config.js
-import reactX from "eslint-plugin-react-x";
-import reactDom from "eslint-plugin-react-dom";
-
-export default defineConfig([
-  globalIgnores(["dist"]),
-  {
-    files: ["**/*.{ts,tsx}"],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs["recommended-typescript"],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ["./tsconfig.node.json", "./tsconfig.app.json"],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-]);
+```sh
+sudo apt install flatpak flatpak-builder
 ```
+
+If the Flathub remote is not configured, add it before building or installing:
+
+```sh
+flatpak remote-add --user --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
+```
+
+Install JavaScript dependencies and create the installer:
+
+```sh
+vp install
+vp run build:flatpak
+```
+
+If you use pnpm directly, `pnpm build:flatpak` runs the same package script.
+
+The resulting bundle is written to `release/Klipp-<version>-x86_64.flatpak`.
+Temporary Flatpak Builder files are kept under `release/` and are removed by
+the packaging tool after a successful build.
+
+## Install and run
+
+```sh
+flatpak install --user ./release/Klipp-<version>-x86_64.flatpak
+flatpak run io.github.ErnestoMuniz.Klipp
+```
+
+To uninstall the app while keeping its data, run:
+
+```sh
+flatpak uninstall io.github.ErnestoMuniz.Klipp
+```
+
+Klipp stores its Flatpak data under
+`~/.var/app/io.github.ErnestoMuniz.Klipp/` and keeps it across uninstall and
+reinstall unless it is explicitly removed.
+
+## Permissions and desktop support
+
+This first package prioritizes the existing Klipp feature set over a minimal
+sandbox. It requests network access for online sound search/imports, display
+and GPU access for Electron, PulseAudio/PipeWire access for playback, and tray
+and notification D-Bus access.
+
+Klipp also has broad device access for its native keyboard listener and can
+invoke the host `pactl` through Flatpak's host bridge. Those permissions are
+needed to preserve the global quick-overlay shortcut and virtual microphone
+audio graph. The package is explicitly tested for X11. On Wayland, Electron's
+Global Shortcuts portal is used where the desktop supports it; direct keyboard
+hooks may be unavailable, in which case Klipp continues with Electron's
+shortcut fallback.
+
+The host needs a `pactl` command compatible with PulseAudio or PipeWire-Pulse
+for virtual microphone routing. If it is unavailable, Klipp remains usable as
+a normal soundboard and reports the audio-routing failure in the app.

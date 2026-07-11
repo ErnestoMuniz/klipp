@@ -91,6 +91,16 @@ function Soundboard() {
   }, [api, t]);
 
   useEffect(() => {
+    if (!window.ipcRenderer) return;
+    const handler = (_event: unknown, ...args: unknown[]) => {
+      const [next] = args;
+      if (next && typeof next === "object") setState(next as AudioState);
+    };
+    window.ipcRenderer.on("audio:state-changed", handler);
+    return () => window.ipcRenderer?.off("audio:state-changed", handler);
+  }, []);
+
+  useEffect(() => {
     if (audioRef.current) audioRef.current.volume = muted ? 0 : volume;
   }, [volume, muted]);
 

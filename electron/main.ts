@@ -12,7 +12,7 @@ import {
 } from "electron";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { uIOhook, UiohookKey, type UiohookKeyboardEvent } from "uiohook-napi";
+import type { UiohookKeyboardEvent } from "uiohook-napi";
 import { AudioManager, registerAudioIpc, registerSoundProtocol, SOUND_SCHEME } from "./audio";
 import { searchMyinstants } from "./myinstants";
 import {
@@ -76,6 +76,9 @@ let win: BrowserWindow | null = null;
 let tray: Tray | null = null;
 let isQuitting = false;
 let shortcutHeld = false;
+let nativeShortcutHookStarted = false;
+let nativeShortcutHook: typeof import("uiohook-napi").uIOhook | null = null;
+let nativeShortcutKeys: typeof import("uiohook-napi").UiohookKey | null = null;
 let overlayActive = false;
 let activeOverlayDisplayId: number | null = null;
 
@@ -391,25 +394,19 @@ function matchesModifiers(event: UiohookKeyboardEvent, parsed: ParsedAccelerator
 }
 
 function isShortcutModifierKey(event: UiohookKeyboardEvent, parsed: ParsedAccelerator): boolean {
-  if (parsed.alt && (event.keycode === UiohookKey.Alt || event.keycode === UiohookKey.AltRight)) {
+  const keys = nativeShortcutKeys;
+  if (!keys) return false;
+
+  if (parsed.alt && (event.keycode === keys.Alt || event.keycode === keys.AltRight)) {
     return true;
   }
-  if (
-    parsed.shift &&
-    (event.keycode === UiohookKey.Shift || event.keycode === UiohookKey.ShiftRight)
-  ) {
+  if (parsed.shift && (event.keycode === keys.Shift || event.keycode === keys.ShiftRight)) {
     return true;
   }
-  if (
-    parsed.ctrl &&
-    (event.keycode === UiohookKey.Ctrl || event.keycode === UiohookKey.CtrlRight)
-  ) {
+  if (parsed.ctrl && (event.keycode === keys.Ctrl || event.keycode === keys.CtrlRight)) {
     return true;
   }
-  if (
-    parsed.meta &&
-    (event.keycode === UiohookKey.Meta || event.keycode === UiohookKey.MetaRight)
-  ) {
+  if (parsed.meta && (event.keycode === keys.Meta || event.keycode === keys.MetaRight)) {
     return true;
   }
   return false;
@@ -449,6 +446,53 @@ function applyShortcut(accelerator: string): {
   return { shortcut: accelerator, registered: true };
 }
 
+async function startNativeShortcutHook(): Promise<void> {
+  // Flatpak deliberately isolates applications from the host's raw input
+  // devices/XRecord backend. uIOhook can block synchronously while trying to
+  // initialise that backend, freezing the Electron main loop after the native
+  // window has been created but before its renderer paints. Inside Flatpak the
+  // Electron globalShortcut implementation uses the GlobalShortcuts portal.
+  if (process.env.FLATPAK_ID) {
+    console.info("Flatpak detected; using the GlobalShortcuts portal.");
+    return;
+  }
+
+  try {
+    // An unavailable native input backend must never prevent Electron from
+    // showing the main window in a sandboxed session.
+    const { uIOhook, UiohookKey } = await import("uiohook-napi");
+    nativeShortcutHook = uIOhook;
+    nativeShortcutKeys = UiohookKey;
+
+    uIOhook.on("keydown", (event) => {
+      if (shortcutHeld || !currentParsed) return;
+      if (!matchesModifiers(event, currentParsed) || event.keycode !== currentParsed.key) return;
+      shortcutHeld = true;
+      showOverlay();
+    });
+
+    uIOhook.on("keyup", (event) => {
+      if (!shortcutHeld || !currentParsed) return;
+      if (event.keycode !== currentParsed.key && !isShortcutModifierKey(event, currentParsed)) {
+        return;
+      }
+      shortcutHeld = false;
+      confirmOverlaySelection();
+    });
+
+    uIOhook.start();
+    nativeShortcutHookStarted = true;
+  } catch (error) {
+    // This can happen in a sandboxed Wayland session when direct input access
+    // is unavailable. Electron's globalShortcut registration above remains a
+    // usable fallback, so never make the whole application fail to start.
+    console.warn(
+      "Native global shortcut hook unavailable; using Electron shortcut fallback.",
+      error,
+    );
+  }
+}
+
 function registerShortcut(): void {
   const registered = globalShortcut.register(currentShortcut, () => {
     shortcutHeld = true;
@@ -459,23 +503,7 @@ function registerShortcut(): void {
     console.error(`Não foi possível registrar o atalho global ${currentShortcut}.`);
   }
 
-  uIOhook.on("keydown", (event) => {
-    if (shortcutHeld || !currentParsed) return;
-    if (!matchesModifiers(event, currentParsed) || event.keycode !== currentParsed.key) return;
-    shortcutHeld = true;
-    showOverlay();
-  });
-
-  uIOhook.on("keyup", (event) => {
-    if (!shortcutHeld || !currentParsed) return;
-    if (event.keycode !== currentParsed.key && !isShortcutModifierKey(event, currentParsed)) {
-      return;
-    }
-    shortcutHeld = false;
-    confirmOverlaySelection();
-  });
-
-  uIOhook.start();
+  void startNativeShortcutHook();
   registerShortcutIpc({ getCurrent: () => currentShortcut, onApply: applyShortcut });
 }
 
@@ -492,7 +520,13 @@ function cleanupAndExit(exitCode = 0): void {
   if (cleaningUp) return;
   cleaningUp = true;
   globalShortcut.unregisterAll();
-  uIOhook.stop();
+  if (nativeShortcutHookStarted && nativeShortcutHook) {
+    try {
+      nativeShortcutHook.stop();
+    } catch (error) {
+      console.warn("Unable to stop native global shortcut hook.", error);
+    }
+  }
   hideOverlays();
   void audio.cleanup().finally(() => process.exit(exitCode));
 }
@@ -542,7 +576,6 @@ void app.whenReady().then(async () => {
   currentSettings = await loadAppSettings();
 
   registerSoundProtocol();
-  await audio.init();
   registerAudioIpc(audio);
 
   // Renderer side of myinstants browse: forward searches to the scraper. Done
@@ -567,4 +600,10 @@ void app.whenReady().then(async () => {
   createTray();
   registerOverlayIpc();
   registerShortcut();
+
+  // Audio routing invokes host PulseAudio/PipeWire commands in the Flatpak
+  // build. Do not make that work a prerequisite for showing the app window.
+  void audio.init().finally(() => {
+    win?.webContents.send("audio:state-changed", audio.getState());
+  });
 });
