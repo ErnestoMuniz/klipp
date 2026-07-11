@@ -1,7 +1,7 @@
 import { execFile } from "node:child_process";
 import { app, dialog, ipcMain, protocol } from "electron";
 import fs from "node:fs/promises";
-import { createReadStream } from "node:fs";
+import { createReadStream, watch, type FSWatcher } from "node:fs";
 import path from "node:path";
 import { Readable } from "node:stream";
 import { MYINSTANTS_USER_AGENT } from "./myinstants";
@@ -241,6 +241,8 @@ function sourceDescription(output: string, sourceName: string): string {
 export class AudioManager {
   private loaded: LoadedModule[] = [];
   private existed = new Set<ModuleKind>();
+  private soundsWatcher: FSWatcher | null = null;
+  private soundsWatchTimer: NodeJS.Timeout | null = null;
 
   ready = false;
   error: string | null = null;
@@ -473,6 +475,25 @@ export class AudioManager {
     return this.getState();
   }
 
+  async watchSounds(onChange: (state: AudioState) => void): Promise<void> {
+    const dir = this.soundsDir();
+    await fs.mkdir(dir, { recursive: true });
+    this.soundsWatcher?.close();
+    this.soundsWatcher = watch(dir, { persistent: false }, () => {
+      if (this.soundsWatchTimer) clearTimeout(this.soundsWatchTimer);
+      this.soundsWatchTimer = setTimeout(() => {
+        this.soundsWatchTimer = null;
+        void this.relistSounds()
+          .then(onChange)
+          .catch(() => {});
+      }, 100);
+    });
+    this.soundsWatcher.on("error", () => {
+      this.soundsWatcher?.close();
+      this.soundsWatcher = null;
+    });
+  }
+
   async updateSoundMetadata(url: string, metadata: SoundMetadata): Promise<AudioState> {
     const sound = this.sounds.find((candidate) => candidate.url === url);
     if (!sound) return this.getState();
@@ -599,6 +620,10 @@ export class AudioManager {
   }
 
   async cleanup(): Promise<void> {
+    if (this.soundsWatchTimer) clearTimeout(this.soundsWatchTimer);
+    this.soundsWatchTimer = null;
+    this.soundsWatcher?.close();
+    this.soundsWatcher = null;
     for (const mod of [...this.loaded].reverse()) {
       if (this.existed.has(mod.kind)) continue;
       await runPactl(["unload-module", mod.index]).catch(() => {});

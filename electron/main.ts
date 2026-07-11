@@ -616,5 +616,13 @@ void app.whenReady().then(async () => {
   // build. Do not make that work a prerequisite for showing the app window.
   void audio.init().finally(() => {
     win?.webContents.send("audio:state-changed", audio.getState());
+    void audio
+      .watchSounds((state) => {
+        const window = win;
+        if (window && !window.isDestroyed()) {
+          window.webContents.send("audio:state-changed", state);
+        }
+      })
+      .catch(() => {});
   });
 });
