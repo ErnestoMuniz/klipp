@@ -76,6 +76,8 @@ export const en = {
   "overlay.soundsAria": "Available sounds",
   "overlay.playAria": "Play {label}",
   "overlay.playing": "Playing",
+  "overlay.stop": "Stop",
+  "overlay.stopAria": "Stop current audio",
   "overlay.soundboard": "Soundboard",
   "overlay.noSounds": "No sounds",
   "overlay.pick": "Pick a sound",

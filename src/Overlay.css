@@ -202,6 +202,34 @@ button {
   animation: ov-hub-in 260ms ease-out both;
 }
 
+.overlay-center.is-cancel {
+  font: inherit;
+  cursor: pointer;
+  color: var(--ov-accent);
+  transition:
+    background 140ms ease,
+    border-color 140ms ease,
+    transform 140ms ease;
+}
+
+.overlay-center.is-cancel:hover,
+.overlay-center.is-cancel:focus-visible {
+  border-color: color-mix(in srgb, var(--ov-accent) 55%, transparent);
+  background: color-mix(in srgb, var(--ov-accent) 14%, var(--ov-panel));
+  outline: none;
+}
+
+.overlay-center.is-cancel:active {
+  transform: translate(-50%, -50%) scale(0.96);
+}
+
+.overlay-center.is-cancel small {
+  max-width: 108px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 @keyframes ov-hub-in {
   from {
     opacity: 0;

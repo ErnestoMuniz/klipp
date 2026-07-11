@@ -78,6 +78,8 @@ export const ptBR: Messages = {
   "overlay.soundsAria": "Áudios disponíveis",
   "overlay.playAria": "Tocar {label}",
   "overlay.playing": "A tocar",
+  "overlay.stop": "Parar",
+  "overlay.stopAria": "Parar áudio atual",
   "overlay.soundboard": "Soundboard",
   "overlay.noSounds": "Sem áudios",
   "overlay.pick": "Escolha um som",

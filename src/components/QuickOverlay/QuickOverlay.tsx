@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties } from "react";
 import type { SoundFile } from "../../audio-globals";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight, Square } from "lucide-react";
 import { emojiFontFamily } from "../Soundboard/emojiFont";
 import { loadPrefs } from "../Soundboard/types";
 import { useI18n } from "../../i18n";
@@ -90,17 +90,7 @@ function Overlay() {
       setPosition(null);
     };
     window.ipcRenderer?.on("overlay:hide", onHide);
-    const stopPlayback = () => {
-      playbackIdRef.current += 1;
-      const current = audioRef.current;
-      if (!current) return;
-      current.onended = null;
-      current.onerror = null;
-      current.pause();
-      current.removeAttribute("src");
-      audioRef.current = null;
-      setPlaying(null);
-    };
+    const stopPlayback = () => stopCurrentPlayback(false);
     window.ipcRenderer?.on("overlay:stop-playback", stopPlayback);
     const confirmSelection = () => {
       const hoveredSound = hoveredSoundRef.current;
@@ -149,6 +139,19 @@ function Overlay() {
   function closeOutside(event: React.PointerEvent<HTMLElement>): void {
     if (!active || event.target !== event.currentTarget) return;
     window.overlay?.hide();
+  }
+
+  function stopCurrentPlayback(notifyMain = true): void {
+    playbackIdRef.current += 1;
+    const current = audioRef.current;
+    if (!current) return;
+    current.onended = null;
+    current.onerror = null;
+    current.pause();
+    current.removeAttribute("src");
+    audioRef.current = null;
+    setPlaying(null);
+    if (notifyMain) window.overlay?.playbackEnded();
   }
 
   function play(sound: SoundFile): void {
@@ -273,39 +276,44 @@ function Overlay() {
               })}
             </svg>
 
-            <div className="overlay-center">
-              <span className={`overlay-kicker${playing ? " is-live" : ""}`}>
-                {playing ? t("overlay.playing") : t("overlay.soundboard")}
-              </span>
-              {sounds.length === 0 ? (
-                <strong>{t("overlay.noSounds")}</strong>
-              ) : playingSound ? (
-                <strong title={soundLabel(playingSound)}>{soundLabel(playingSound)}</strong>
-              ) : (
-                <strong>{t("overlay.pick")}</strong>
-              )}
-              {pageCount > 1 && (
-                <div className="overlay-pages">
-                  <button
-                    type="button"
-                    aria-label={t("overlay.prevPage")}
-                    onClick={() => changePage(-1)}
-                  >
-                    <ChevronLeft size={14} />
-                  </button>
-                  <span>
-                    {page + 1}/{pageCount}
-                  </span>
-                  <button
-                    type="button"
-                    aria-label={t("overlay.nextPage")}
-                    onClick={() => changePage(1)}
-                  >
-                    <ChevronRight size={14} />
-                  </button>
-                </div>
-              )}
-            </div>
+            {playingSound ? (
+              <button
+                type="button"
+                className="overlay-center is-cancel"
+                aria-label={t("overlay.stopAria")}
+                onClick={() => stopCurrentPlayback()}
+              >
+                <Square size={20} fill="currentColor" aria-hidden="true" />
+                <strong>{t("overlay.stop")}</strong>
+                <small title={soundLabel(playingSound)}>{soundLabel(playingSound)}</small>
+              </button>
+            ) : (
+              <div className="overlay-center">
+                <span className="overlay-kicker">{t("overlay.soundboard")}</span>
+                <strong>{sounds.length === 0 ? t("overlay.noSounds") : t("overlay.pick")}</strong>
+                {pageCount > 1 && (
+                  <div className="overlay-pages">
+                    <button
+                      type="button"
+                      aria-label={t("overlay.prevPage")}
+                      onClick={() => changePage(-1)}
+                    >
+                      <ChevronLeft size={14} />
+                    </button>
+                    <span>
+                      {page + 1}/{pageCount}
+                    </span>
+                    <button
+                      type="button"
+                      aria-label={t("overlay.nextPage")}
+                      onClick={() => changePage(1)}
+                    >
+                      <ChevronRight size={14} />
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
           </section>
         </div>
       )}
