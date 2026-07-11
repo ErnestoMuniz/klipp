@@ -501,9 +501,23 @@ export class AudioManager {
     if (res.canceled || res.filePaths.length === 0) {
       return this.getState();
     }
+    return this.importSounds(res.filePaths);
+  }
+
+  async importSounds(files: string[]): Promise<AudioState> {
+    const validFiles: string[] = [];
+    for (const file of files) {
+      if (typeof file !== "string" || !AUDIO_EXTS.has(path.extname(file).slice(1).toLowerCase())) {
+        continue;
+      }
+      const stats = await fs.stat(file).catch(() => null);
+      if (stats?.isFile()) validFiles.push(file);
+    }
+    if (validFiles.length === 0) return this.getState();
+
     const dir = this.soundsDir();
     await fs.mkdir(dir, { recursive: true });
-    for (const file of res.filePaths) {
+    for (const file of validFiles) {
       await fs.copyFile(file, path.join(dir, path.basename(file)));
     }
     this.sounds = await this.listSounds();
@@ -677,6 +691,9 @@ export function registerAudioIpc(manager: AudioManager): void {
     manager.setHearClips(enabled),
   );
   ipcMain.handle("audio:add-sounds", async () => manager.addSounds());
+  ipcMain.handle("audio:import-sounds", async (_event, files: string[]) =>
+    manager.importSounds(files),
+  );
   ipcMain.handle("audio:relist-sounds", async () => manager.relistSounds());
   ipcMain.handle("audio:install-remote-sound", async (_event, sound: RemoteSoundImport) =>
     manager.installRemoteSound(sound),

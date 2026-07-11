@@ -32,10 +32,12 @@ function Soundboard() {
   const [fatal, setFatal] = useState<string | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [onlineOpen, setOnlineOpen] = useState(false);
+  const [draggingSounds, setDraggingSounds] = useState(false);
   const [editingSound, setEditingSound] = useState<SoundFile | null>(null);
   const [query, setQuery] = useState("");
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const playbackIdRef = useRef(0);
+  const dragDepthRef = useRef(0);
 
   const api: AudioApi | undefined = window.audio;
   const { shortcut, set: setShortcut } = useShortcut();
@@ -173,6 +175,17 @@ function Soundboard() {
     if (next) setState(next);
   }
 
+  async function onDropSounds(event: React.DragEvent<HTMLElement>) {
+    event.preventDefault();
+    dragDepthRef.current = 0;
+    setDraggingSounds(false);
+    if (!api || disabled) return;
+    const files = [...event.dataTransfer.files];
+    if (files.length === 0) return;
+    const next = await run(() => api.importSounds(files));
+    if (next) setState(next);
+  }
+
   async function onSaveSoundMetadata(sound: SoundFile, metadata: SoundMetadata) {
     if (!api) return;
     const next = await run(() => api.updateSoundMetadata(sound.url, metadata));
@@ -285,9 +298,30 @@ function Soundboard() {
     <section
       id="soundboard"
       className={cx(
-        "relative z-1 mx-auto flex w-full flex-col gap-4 px-6 pb-32 text-left max-sm:px-3.5 max-sm:pb-36",
+        "relative z-1 mx-auto flex min-h-svh w-full flex-col gap-4 px-6 pb-32 text-left max-sm:px-3.5 max-sm:pb-36",
       )}
+      onDragEnter={(event) => {
+        if (!event.dataTransfer.types.includes("Files")) return;
+        event.preventDefault();
+        dragDepthRef.current += 1;
+        setDraggingSounds(true);
+      }}
+      onDragOver={(event) => {
+        if (!event.dataTransfer.types.includes("Files")) return;
+        event.preventDefault();
+        event.dataTransfer.dropEffect = "copy";
+      }}
+      onDragLeave={() => {
+        dragDepthRef.current = Math.max(0, dragDepthRef.current - 1);
+        if (dragDepthRef.current === 0) setDraggingSounds(false);
+      }}
+      onDrop={(event) => void onDropSounds(event)}
     >
+      {draggingSounds && (
+        <div className="pointer-events-none fixed inset-4 z-50 grid place-items-center rounded-xl border-2 border-dashed border-(--accent) bg-(--bg)/90 text-lg font-semibold text-(--accent) backdrop-blur-sm">
+          {t("dropSounds.label")}
+        </div>
+      )}
       <Topbar />
 
       {soundboardState.error && (

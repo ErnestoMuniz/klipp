@@ -1,4 +1,4 @@
-import { ipcRenderer, contextBridge } from "electron";
+import { ipcRenderer, contextBridge, webUtils } from "electron";
 import type { SoundMetadata } from "./audio";
 
 contextBridge.exposeInMainWorld("ipcRenderer", {
@@ -26,6 +26,11 @@ contextBridge.exposeInMainWorld("audio", {
   setMicPassthrough: (enabled: boolean) => ipcRenderer.invoke("audio:set-mic-passthrough", enabled),
   setHearClips: (enabled: boolean) => ipcRenderer.invoke("audio:set-hear-clips", enabled),
   addSounds: () => ipcRenderer.invoke("audio:add-sounds"),
+  importSounds: (files: File[]) =>
+    ipcRenderer.invoke(
+      "audio:import-sounds",
+      files.map((file) => webUtils.getPathForFile(file)),
+    ),
   relistSounds: () => ipcRenderer.invoke("audio:relist-sounds"),
   updateSoundMetadata: (url: string, metadata: SoundMetadata) =>
     ipcRenderer.invoke("audio:update-sound-metadata", url, metadata),

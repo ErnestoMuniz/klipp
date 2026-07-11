@@ -8,6 +8,7 @@ export const en = {
   "app.fatalAudio": "The audio API is unavailable (preload didn't load). Restart the app.",
   "app.addSoundsAria": "Add sounds",
   "app.addSoundsTitle": "Add sounds",
+  "dropSounds.label": "Drop sounds to add them to your library",
 
   "toolbar.library": "Library",
   "toolbar.searchPlaceholder": "Search sounds…",

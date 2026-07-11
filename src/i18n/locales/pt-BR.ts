@@ -10,6 +10,7 @@ export const ptBR: Messages = {
   "app.fatalAudio": "A API de áudio não está disponível (preload não carregou). Reinicie o app.",
   "app.addSoundsAria": "Adicionar áudios",
   "app.addSoundsTitle": "Adicionar áudios",
+  "dropSounds.label": "Solte os áudios para adicioná-los à biblioteca",
 
   "toolbar.library": "Biblioteca",
   "toolbar.searchPlaceholder": "Pesquisar áudios…",
