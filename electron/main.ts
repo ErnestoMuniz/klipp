@@ -573,6 +573,15 @@ ipcMain.on("window:close", () => {
 // Set app name early so Linux window managers can match the .desktop file icon
 app.setName("klipp");
 
+const hasSingleInstanceLock = app.requestSingleInstanceLock();
+if (!hasSingleInstanceLock) {
+  app.exit(0);
+}
+
+app.on("second-instance", () => {
+  if (app.isReady()) showWindow();
+});
+
 void app.whenReady().then(async () => {
   // No application menu, no visible menu bar — the UI owns all chrome.
   Menu.setApplicationMenu(null);
