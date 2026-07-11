@@ -69,6 +69,7 @@ export const en = {
   "pad.addToPicker": "Add to quick picker",
   "pad.edit": "Edit sound",
   "pad.playing": "Playing",
+  "pad.duration": "{seconds} seconds",
   "pad.play": "Play",
 
   "error.prefix": "Error:",

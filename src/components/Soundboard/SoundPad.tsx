@@ -6,6 +6,31 @@ import { Edit3, Star, StarOff } from "lucide-react";
 import { emojiFontFamily } from "./emojiFont";
 import { soundLabel } from "./types";
 import { useI18n } from "../../i18n";
+import { useEffect, useState } from "react";
+
+const durationCache = new Map<string, Promise<number | null>>();
+
+function loadDuration(url: string): Promise<number | null> {
+  const cached = durationCache.get(url);
+  if (cached) return cached;
+
+  const pending = new Promise<number | null>((resolve) => {
+    const audio = new Audio();
+    audio.preload = "metadata";
+    audio.onloadedmetadata = () => {
+      const duration = Number.isFinite(audio.duration) ? audio.duration : null;
+      audio.removeAttribute("src");
+      resolve(duration);
+    };
+    audio.onerror = () => {
+      audio.removeAttribute("src");
+      resolve(null);
+    };
+    audio.src = url;
+  });
+  durationCache.set(url, pending);
+  return pending;
+}
 
 interface SoundPadProps {
   density: Density;
@@ -26,6 +51,17 @@ export function SoundPad({
 }: SoundPadProps) {
   const { t } = useI18n();
   const label = soundLabel(sound);
+  const [duration, setDuration] = useState<number | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    void loadDuration(sound.url).then((nextDuration) => {
+      if (!cancelled) setDuration(nextDuration);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [sound.url]);
 
   return (
     <button
@@ -118,13 +154,19 @@ export function SoundPad({
       </span>
       <span
         className={cx(
-          "shrink-0 font-mono text-xs font-semibold uppercase tracking-widest text-(--text-faint)",
+          "flex shrink-0 items-center justify-between gap-2 font-mono text-xs font-semibold tracking-widest text-(--text-faint)",
           isPlaying && "text-(--accent)",
-          density === "compact" && "hidden",
+          density === "comfort" ? "w-full" : "ml-auto",
         )}
-        aria-hidden="true"
       >
-        {isPlaying ? t("pad.playing") : t("pad.play")}
+        <span className={cx(density === "compact" && "sr-only")}>
+          {isPlaying ? t("pad.playing") : t("pad.play")}
+        </span>
+        {duration !== null && (
+          <span aria-label={t("pad.duration", { seconds: Math.ceil(duration) })}>
+            {Math.ceil(duration)}s
+          </span>
+        )}
       </span>
     </button>
   );

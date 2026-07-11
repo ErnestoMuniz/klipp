@@ -71,6 +71,7 @@ export const ptBR: Messages = {
   "pad.addToPicker": "Adicionar ao seletor rápido",
   "pad.edit": "Editar áudio",
   "pad.playing": "A tocar",
+  "pad.duration": "{seconds} segundos",
   "pad.play": "Tocar",
 
   "error.prefix": "Erro:",
