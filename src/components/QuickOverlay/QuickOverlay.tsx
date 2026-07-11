@@ -3,6 +3,7 @@ import type { CSSProperties } from "react";
 import type { SoundFile } from "../../audio-globals";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { emojiFontFamily } from "../Soundboard/emojiFont";
+import { loadPrefs } from "../Soundboard/types";
 import { useI18n } from "../../i18n";
 
 const PAGE_SIZE = 8;
@@ -162,6 +163,8 @@ function Overlay() {
     const playbackId = playbackIdRef.current + 1;
     playbackIdRef.current = playbackId;
     const player = new Audio(sound.url);
+    const { muted, volume } = loadPrefs();
+    player.volume = muted ? 0 : volume;
     audioRef.current = player;
     setPlaying(sound.url);
 
