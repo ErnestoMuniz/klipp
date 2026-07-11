@@ -7,6 +7,14 @@ import renderer from "vite-plugin-electron-renderer";
 
 // https://vite.dev/config/
 export default defineConfig({
+  server: {
+    watch: {
+      // electron-builder leaves a Flatpak build root under release/.flatpak-tmp.
+      // It contains system symlink loops (for example /var/run/udev/watch), so
+      // it must never be traversed by the development watcher.
+      ignored: ["**/release/**"],
+    },
+  },
   staged: {
     "*": "vp check --fix",
   },

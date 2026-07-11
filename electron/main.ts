@@ -312,15 +312,26 @@ function showOverlay(): void {
   activeOverlayDisplayId = activeDisplay.id;
   for (const view of overlays.values()) {
     if (view.window.isDestroyed()) continue;
-    if (view.rendererReady) {
-      view.window.webContents.send("overlay:show", audio.overlaySounds());
+    if (!view.rendererReady) {
+      // A transparent window without a renderer must remain click-through.
+      // Otherwise a dev-server failure leaves an invisible fullscreen window
+      // intercepting the desktop until the application is terminated.
+      view.window.setIgnoreMouseEvents(true);
+      view.window.setFocusable(false);
+      continue;
     }
+    view.window.webContents.send("overlay:show", audio.overlaySounds());
     view.window.setSkipTaskbar(true);
     view.window.setFocusable(true);
     view.window.setIgnoreMouseEvents(false);
   }
 
-  overlays.get(activeDisplay.id)?.window.focus();
+  const activeOverlay = overlays.get(activeDisplay.id);
+  if (!activeOverlay?.rendererReady || activeOverlay.window.isDestroyed()) {
+    hideOverlays();
+    return;
+  }
+  activeOverlay.window.focus();
 }
 
 function confirmOverlaySelection(): void {
