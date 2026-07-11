@@ -31,6 +31,7 @@ export const en = {
   "shortcut.hintPrefix": "Click a pad to play it. In any app, ",
   "shortcut.hintMiddle": " opens the quick picker · ",
   "shortcut.hintSuffix": " closes.",
+  "shortcut.dismiss": "Hide shortcut tip",
 
   "transport.stopTitle": "Stop",
   "transport.idleTitle": "Not playing",

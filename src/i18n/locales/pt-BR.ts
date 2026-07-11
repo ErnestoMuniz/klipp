@@ -33,6 +33,7 @@ export const ptBR: Messages = {
   "shortcut.hintPrefix": "Clique num pad para o tocar. Em qualquer app, ",
   "shortcut.hintMiddle": " abre o seletor rápido · ",
   "shortcut.hintSuffix": " fecha.",
+  "shortcut.dismiss": "Ocultar dica do atalho",
 
   "transport.stopTitle": "Parar",
   "transport.idleTitle": "Sem reprodução",

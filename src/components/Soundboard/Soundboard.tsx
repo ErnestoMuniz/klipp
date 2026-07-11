@@ -312,7 +312,12 @@ function Soundboard() {
         onSettingsToggle={() => setSettingsOpen((value) => !value)}
       />
 
-      {prefs.showHints && soundCount > 0 && <ShortcutBanner shortcut={shortcut} />}
+      {prefs.showHints && soundCount > 0 && (
+        <ShortcutBanner
+          shortcut={shortcut}
+          onDismiss={() => setPrefs((current) => ({ ...current, showHints: false }))}
+        />
+      )}
 
       <SoundStage
         density={prefs.density}

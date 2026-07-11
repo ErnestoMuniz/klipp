@@ -1,12 +1,13 @@
-import { Command } from "lucide-react";
-import { Card, IconTile } from "./ui";
+import { Command, X } from "lucide-react";
+import { Button, Card, IconTile } from "./ui";
 import { useI18n } from "../../i18n";
 
 interface ShortcutBannerProps {
+  onDismiss: () => void;
   shortcut: string;
 }
 
-export function ShortcutBanner({ shortcut }: ShortcutBannerProps) {
+export function ShortcutBanner({ onDismiss, shortcut }: ShortcutBannerProps) {
   const { t } = useI18n();
   return (
     <Card
@@ -23,6 +24,14 @@ export function ShortcutBanner({ shortcut }: ShortcutBannerProps) {
         <code className="border border-(--border) bg-(--surface) font-semibold">Esc</code>
         {t("shortcut.hintSuffix")}
       </span>
+      <Button
+        variant="ghost"
+        aria-label={t("shortcut.dismiss")}
+        title={t("shortcut.dismiss")}
+        onClick={onDismiss}
+      >
+        <X size={15} />
+      </Button>
     </Card>
   );
 }
