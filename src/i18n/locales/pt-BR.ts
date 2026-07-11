@@ -72,6 +72,8 @@ export const ptBR: Messages = {
   "pad.edit": "Editar áudio",
   "pad.playing": "A tocar",
   "pad.duration": "{seconds} segundos",
+  "pad.delete": "Eliminar áudio",
+  "pad.deleteConfirm": "Eliminar “{label}” da biblioteca? Esta ação não pode ser desfeita.",
   "pad.play": "Tocar",
 
   "error.prefix": "Erro:",

@@ -26,6 +26,7 @@ contextBridge.exposeInMainWorld("audio", {
   setMicPassthrough: (enabled: boolean) => ipcRenderer.invoke("audio:set-mic-passthrough", enabled),
   setHearClips: (enabled: boolean) => ipcRenderer.invoke("audio:set-hear-clips", enabled),
   addSounds: () => ipcRenderer.invoke("audio:add-sounds"),
+  deleteSound: (url: string) => ipcRenderer.invoke("audio:delete-sound", url),
   importSounds: (files: File[]) =>
     ipcRenderer.invoke(
       "audio:import-sounds",

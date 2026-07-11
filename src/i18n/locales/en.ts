@@ -70,6 +70,8 @@ export const en = {
   "pad.edit": "Edit sound",
   "pad.playing": "Playing",
   "pad.duration": "{seconds} seconds",
+  "pad.delete": "Delete sound",
+  "pad.deleteConfirm": "Delete “{label}” from your library? This cannot be undone.",
   "pad.play": "Play",
 
   "error.prefix": "Error:",

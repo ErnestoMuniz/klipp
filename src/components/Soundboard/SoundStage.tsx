@@ -12,6 +12,7 @@ interface SoundStageProps {
   sounds: SoundFile[];
   totalSounds: number;
   onAddSounds: () => void;
+  onDelete: (sound: SoundFile) => void;
   onEdit: (sound: SoundFile) => void;
   onPlay: (url: string) => void;
   onToggleOverlay: (sound: SoundFile) => void;
@@ -25,6 +26,7 @@ export function SoundStage({
   sounds,
   totalSounds,
   onAddSounds,
+  onDelete,
   onEdit,
   onPlay,
   onToggleOverlay,
@@ -61,6 +63,7 @@ export function SoundStage({
             density={density}
             isPlaying={playing === sound.url}
             sound={sound}
+            onDelete={onDelete}
             onEdit={onEdit}
             onPlay={onPlay}
             onToggleOverlay={onToggleOverlay}

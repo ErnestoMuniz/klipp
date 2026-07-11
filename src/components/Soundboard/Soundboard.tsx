@@ -195,6 +195,14 @@ function Soundboard() {
     }
   }
 
+  async function onDeleteSound(sound: SoundFile) {
+    if (!api || !window.confirm(t("pad.deleteConfirm", { label: soundLabel(sound) }))) return;
+    if (playing === sound.url) stop();
+    if (editingSound?.url === sound.url) setEditingSound(null);
+    const next = await run(() => api.deleteSound(sound.url));
+    if (next) setState(next);
+  }
+
   async function onToggleOverlay(sound: SoundFile) {
     if (!api) return;
     const next = await run(() =>
@@ -361,6 +369,7 @@ function Soundboard() {
         sounds={filtered}
         totalSounds={soundCount}
         onAddSounds={() => void onAddSounds()}
+        onDelete={(sound) => void onDeleteSound(sound)}
         onEdit={setEditingSound}
         onPlay={play}
         onToggleOverlay={(sound) => void onToggleOverlay(sound)}

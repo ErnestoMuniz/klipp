@@ -492,6 +492,18 @@ export class AudioManager {
     return this.getState();
   }
 
+  async deleteSound(url: string): Promise<AudioState> {
+    const sound = this.sounds.find((candidate) => candidate.url === url);
+    if (!sound) return this.getState();
+
+    await fs.unlink(path.join(this.soundsDir(), sound.name));
+    const { [sound.name]: _removed, ...remainingMetadata } = this.soundMetadata;
+    this.soundMetadata = remainingMetadata;
+    await saveSoundMetadata(this.soundMetadata);
+    this.sounds = await this.listSounds();
+    return this.getState();
+  }
+
   async addSounds(): Promise<AudioState> {
     const res = await dialog.showOpenDialog({
       title: "Selecionar áudios",
@@ -691,6 +703,7 @@ export function registerAudioIpc(manager: AudioManager): void {
     manager.setHearClips(enabled),
   );
   ipcMain.handle("audio:add-sounds", async () => manager.addSounds());
+  ipcMain.handle("audio:delete-sound", async (_event, url: string) => manager.deleteSound(url));
   ipcMain.handle("audio:import-sounds", async (_event, files: string[]) =>
     manager.importSounds(files),
   );

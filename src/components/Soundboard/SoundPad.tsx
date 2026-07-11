@@ -2,7 +2,7 @@ import type { SoundFile } from "../../audio-globals";
 import type { Density } from "./types";
 import { cx } from "./styles";
 import { Equalizer } from "./Equalizer";
-import { Edit3, Star, StarOff } from "lucide-react";
+import { Edit3, Star, StarOff, Trash2 } from "lucide-react";
 import { emojiFontFamily } from "./emojiFont";
 import { soundLabel } from "./types";
 import { useI18n } from "../../i18n";
@@ -36,6 +36,7 @@ interface SoundPadProps {
   density: Density;
   isPlaying: boolean;
   sound: SoundFile;
+  onDelete: (sound: SoundFile) => void;
   onEdit: (sound: SoundFile) => void;
   onPlay: (url: string) => void;
   onToggleOverlay: (sound: SoundFile) => void;
@@ -45,6 +46,7 @@ export function SoundPad({
   density,
   isPlaying,
   sound,
+  onDelete,
   onEdit,
   onPlay,
   onToggleOverlay,
@@ -100,6 +102,24 @@ export function SoundPad({
           }}
         >
           {sound.inOverlay ? <Star size={15} /> : <StarOff size={15} />}
+        </span>
+        <span
+          className="grid size-8 cursor-pointer place-items-center rounded-sm border border-(--border) bg-(--surface-sunk) text-(--text-faint) shadow-(--inset-lo) transition hover:border-red-400/50 hover:text-red-500"
+          role="button"
+          tabIndex={0}
+          title={t("pad.delete")}
+          onClick={(event) => {
+            event.stopPropagation();
+            onDelete(sound);
+          }}
+          onKeyDown={(event) => {
+            if (event.key !== "Enter" && event.key !== " ") return;
+            event.preventDefault();
+            event.stopPropagation();
+            onDelete(sound);
+          }}
+        >
+          <Trash2 size={15} />
         </span>
         <span
           className="grid size-8 cursor-pointer place-items-center rounded-sm border border-(--border) bg-(--surface-sunk) text-(--text-faint) shadow-(--inset-lo) transition hover:border-(--accent-border) hover:text-(--accent)"
