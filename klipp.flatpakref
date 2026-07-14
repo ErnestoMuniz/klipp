@@ -1,6 +1,6 @@
 [Flatpak Ref]
 Name=io.github.ErnestoMuniz.Klipp
-Branch=stable
+Branch=master
 Title=Klipp
 Comment=Desktop soundboard with a quick overlay
 Url=https://ernestomuniz.github.io/klipp/repo
