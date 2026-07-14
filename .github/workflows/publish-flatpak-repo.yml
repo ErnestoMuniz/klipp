@@ -27,7 +27,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out source
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           fetch-depth: 0
 
@@ -80,6 +80,9 @@ jobs:
             )
           fi
           mkdir -p pages/repo
+          if [[ ! -f pages/repo/config ]]; then
+            ostree init --repo=pages/repo --mode=archive-z2
+          fi
 
       - name: Import and sign Flatpak bundle
         run: |
