@@ -65,6 +65,7 @@ process.env.PULSE_SINK = "soundboard-clips";
 // `currentParsed` on every event so they always reflect the live binding.
 let currentShortcut = DEFAULT_SHORTCUT;
 let currentParsed: ParsedAccelerator | null = parseAccelerator(DEFAULT_SHORTCUT);
+let currentPlayingUrl: string | null = null;
 
 // ============================================================================
 // ESTADO GLOBAL
@@ -268,7 +269,7 @@ function createOverlay(display: Display): OverlayView {
     overlayWindow.setSkipTaskbar(true);
 
     if (overlayActive) {
-      overlayWindow.webContents.send("overlay:show", audio.overlaySounds());
+      overlayWindow.webContents.send("overlay:show", audio.overlaySounds(), currentPlayingUrl);
       overlayWindow.setFocusable(true);
       overlayWindow.setIgnoreMouseEvents(false);
     } else {
@@ -320,7 +321,7 @@ function showOverlay(): void {
       view.window.setFocusable(false);
       continue;
     }
-    view.window.webContents.send("overlay:show", audio.overlaySounds());
+    view.window.webContents.send("overlay:show", audio.overlaySounds(), currentPlayingUrl);
     view.window.setSkipTaskbar(true);
     view.window.setFocusable(true);
     view.window.setIgnoreMouseEvents(false);
@@ -382,11 +383,31 @@ function registerOverlayIpc(): void {
       if (view === selectedOverlay || view.window.isDestroyed()) continue;
       view.window.webContents.send("overlay:stop-playback");
     }
-    win?.webContents.send("main:sound-playing", sound.name);
+    win?.webContents.send("main:stop-playback");
+    currentPlayingUrl = sound.url;
+    win?.webContents.send("main:sound-playing", sound.url);
     hideOverlays();
   });
   ipcMain.on("overlay:playback-ended", (event) => {
     if (!overlayForWebContents(event.sender.id)) return;
+    currentPlayingUrl = null;
+    win?.webContents.send("main:stop-playback");
+    win?.webContents.send("main:sound-playing", null);
+  });
+  ipcMain.on("main:playback-started", (event, url: string) => {
+    if (event.sender !== win?.webContents) return;
+    for (const view of overlays.values()) {
+      if (!view.window.isDestroyed()) view.window.webContents.send("overlay:stop-playback");
+    }
+    currentPlayingUrl = url;
+    win?.webContents.send("main:sound-playing", url);
+  });
+  ipcMain.on("main:playback-ended", (event) => {
+    if (event.sender !== win?.webContents) return;
+    for (const view of overlays.values()) {
+      if (!view.window.isDestroyed()) view.window.webContents.send("overlay:stop-playback");
+    }
+    currentPlayingUrl = null;
     win?.webContents.send("main:sound-playing", null);
   });
 }

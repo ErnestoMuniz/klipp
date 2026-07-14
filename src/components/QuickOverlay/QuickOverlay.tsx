@@ -76,6 +76,7 @@ function Overlay() {
   useEffect(() => {
     const onShow = (_event: unknown, ...args: unknown[]) => {
       setSounds((args[0] as SoundFile[]) ?? []);
+      setPlaying((args[1] as string | null) ?? null);
       setPage(0);
       positionRef.current = null;
       hoveredSoundRef.current = null;
@@ -144,12 +145,13 @@ function Overlay() {
   function stopCurrentPlayback(notifyMain = true): void {
     playbackIdRef.current += 1;
     const current = audioRef.current;
-    if (!current) return;
-    current.onended = null;
-    current.onerror = null;
-    current.pause();
-    current.removeAttribute("src");
-    audioRef.current = null;
+    if (current) {
+      current.onended = null;
+      current.onerror = null;
+      current.pause();
+      current.removeAttribute("src");
+      audioRef.current = null;
+    }
     setPlaying(null);
     if (notifyMain) window.overlay?.playbackEnded();
   }

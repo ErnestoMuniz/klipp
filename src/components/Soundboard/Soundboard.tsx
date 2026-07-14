@@ -109,11 +109,15 @@ function Soundboard() {
   useEffect(() => {
     if (!window.ipcRenderer) return;
     const handler = (_event: unknown, ...args: unknown[]) => {
-      if (audioRef.current) return;
       setPlaying((args[0] as string | null) ?? null);
     };
+    const stopPlayback = () => stop(false);
     window.ipcRenderer.on("main:sound-playing", handler);
-    return () => window.ipcRenderer?.off("main:sound-playing", handler);
+    window.ipcRenderer.on("main:stop-playback", stopPlayback);
+    return () => {
+      window.ipcRenderer?.off("main:sound-playing", handler);
+      window.ipcRenderer?.off("main:stop-playback", stopPlayback);
+    };
   }, []);
 
   useEffect(
@@ -233,14 +237,18 @@ function Soundboard() {
       element.onerror = null;
       audioRef.current = null;
       setPlaying(null);
+      window.ipcRenderer?.send("main:playback-ended");
     };
 
     element.onended = finish;
     element.onerror = finish;
-    void element.play().catch(finish);
+    void element
+      .play()
+      .then(() => window.ipcRenderer?.send("main:playback-started", url))
+      .catch(finish);
   }
 
-  function stop() {
+  function stop(notifyMain = true) {
     playbackIdRef.current += 1;
     const current = audioRef.current;
     if (current) {
@@ -251,6 +259,7 @@ function Soundboard() {
       audioRef.current = null;
     }
     setPlaying(null);
+    if (notifyMain) window.ipcRenderer?.send("main:playback-ended");
   }
 
   const soundboardState = state ?? emptyState;
