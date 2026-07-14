@@ -83,6 +83,16 @@ jobs:
           if [[ ! -f pages/repo/config ]]; then
             ostree init --repo=pages/repo --mode=archive-z2
           fi
+          # Git does not preserve OSTree's empty directories on gh-pages.
+          # Restore the repository skeleton before running Flatpak commands.
+          mkdir -p \
+            pages/repo/extensions \
+            pages/repo/objects \
+            pages/repo/refs/heads \
+            pages/repo/refs/mirrors \
+            pages/repo/refs/remotes \
+            pages/repo/state \
+            pages/repo/tmp/cache
 
       - name: Import and sign Flatpak bundle
         run: |
