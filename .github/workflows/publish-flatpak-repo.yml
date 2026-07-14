@@ -88,10 +88,13 @@ jobs:
         run: |
           bundle="$(find incoming -maxdepth 1 -name '*.flatpak' -print -quit)"
           flatpak build-import-bundle \
-            --ref="app/$APP_ID/x86_64/stable" \
             --gpg-sign="$GPG_FINGERPRINT" \
             --gpg-homedir="$RUNNER_TEMP/gnupg" \
             pages/repo "$bundle"
+          # Version 1.1.2 was initially imported under an incompatible stable
+          # ref. Remove it now that the bundle's embedded master ref is used.
+          ostree refs --repo=pages/repo --delete \
+            "app/$APP_ID/x86_64/stable"
           flatpak build-update-repo \
             --gpg-import="$RUNNER_TEMP/flatpak-signing-key.asc" \
             --gpg-sign="$GPG_FINGERPRINT" \
@@ -114,7 +117,7 @@ jobs:
           cat > pages/klipp.flatpakref <<EOF
           [Flatpak Ref]
           Name=$APP_ID
-          Branch=stable
+          Branch=master
           Title=Klipp
           Comment=Desktop soundboard with a quick overlay
           Url=$REPO_URL

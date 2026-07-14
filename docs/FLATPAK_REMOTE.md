@@ -51,8 +51,8 @@ vp run release:flatpak
 The second command uses the version in `package.json` (for example `v1.1.1`),
 requires an authenticated [GitHub CLI](https://cli.github.com/), and triggers
 `.github/workflows/publish-flatpak-repo.yml`. The workflow does not compile the
-app. It downloads the release asset, imports it as the `stable` Flatpak branch,
-signs the repository, and pushes the result to `gh-pages`.
+app. It downloads the release asset, imports its embedded `master` Flatpak
+branch, signs the repository, and pushes the result to `gh-pages`.
 
 If a release already exists and you need to republish it, run **Publish Flatpak
 repository** manually from the Actions tab and enter its existing tag.
