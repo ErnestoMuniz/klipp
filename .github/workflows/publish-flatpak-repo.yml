@@ -1,0 +1,137 @@
+name: Publish Flatpak repository
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing GitHub release tag containing the Flatpak bundle
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+concurrency:
+  group: flatpak-pages
+  cancel-in-progress: false
+
+env:
+  APP_ID: io.github.ErnestoMuniz.Klipp
+  REPO_URL: https://ernestomuniz.github.io/klipp/repo
+
+jobs:
+  publish:
+    name: Import bundle and publish Pages branch
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install Flatpak tooling
+        run: sudo apt-get update && sudo apt-get install --yes flatpak ostree
+
+      - name: Download bundle from release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.event.release.tag_name || inputs.tag }}
+        run: |
+          mkdir -p incoming
+          gh release download "$RELEASE_TAG" \
+            --pattern 'Klipp-*-x86_64.flatpak' \
+            --dir incoming
+          test "$(find incoming -maxdepth 1 -name '*.flatpak' | wc -l)" -eq 1 || {
+            echo 'Expected exactly one x86_64 Flatpak release asset.' >&2
+            exit 1
+          }
+
+      - name: Import signing key
+        env:
+          GPG_PRIVATE_KEY: ${{ secrets.FLATPAK_GPG_PRIVATE_KEY }}
+        run: |
+          test -n "$GPG_PRIVATE_KEY" || {
+            echo 'The FLATPAK_GPG_PRIVATE_KEY repository secret is missing.' >&2
+            exit 1
+          }
+          mkdir -m 700 "$RUNNER_TEMP/gnupg"
+          printf '%s' "$GPG_PRIVATE_KEY" | gpg \
+            --homedir "$RUNNER_TEMP/gnupg" --batch --import
+          fingerprint="$(gpg --homedir "$RUNNER_TEMP/gnupg" --batch \
+            --with-colons --list-secret-keys | awk -F: '$1 == "fpr" { print $10; exit }')"
+          test -n "$fingerprint"
+          echo "GPG_FINGERPRINT=$fingerprint" >> "$GITHUB_ENV"
+          gpg --homedir "$RUNNER_TEMP/gnupg" --batch --armor \
+            --export "$fingerprint" > "$RUNNER_TEMP/flatpak-signing-key.asc"
+
+      - name: Restore Pages repository
+        run: |
+          if git ls-remote --exit-code --heads origin gh-pages >/dev/null 2>&1; then
+            git fetch origin gh-pages
+            git worktree add pages FETCH_HEAD
+          else
+            git worktree add --detach pages HEAD
+            (
+              cd pages
+              git checkout --orphan gh-pages
+              git rm -rf .
+            )
+          fi
+          mkdir -p pages/repo
+
+      - name: Import and sign Flatpak bundle
+        run: |
+          bundle="$(find incoming -maxdepth 1 -name '*.flatpak' -print -quit)"
+          flatpak build-import-bundle \
+            --ref="app/$APP_ID/x86_64/stable" \
+            --gpg-sign="$GPG_FINGERPRINT" \
+            --gpg-homedir="$RUNNER_TEMP/gnupg" \
+            pages/repo "$bundle"
+          flatpak build-update-repo \
+            --gpg-import="$RUNNER_TEMP/flatpak-signing-key.asc" \
+            --gpg-sign="$GPG_FINGERPRINT" \
+            --gpg-homedir="$RUNNER_TEMP/gnupg" \
+            pages/repo
+
+      - name: Create remote and install files
+        run: |
+          public_key="$(gpg --homedir "$RUNNER_TEMP/gnupg" --batch \
+            --export "$GPG_FINGERPRINT" | base64 -w0)"
+          cat > pages/klipp.flatpakrepo <<EOF
+          [Flatpak Repo]
+          Title=Klipp
+          Comment=Official Klipp Flatpak repository
+          Url=$REPO_URL
+          Homepage=https://github.com/ErnestoMuniz/klipp
+          Icon=https://raw.githubusercontent.com/ErnestoMuniz/klipp/main/public/logo.png
+          GPGKey=$public_key
+          EOF
+          cat > pages/klipp.flatpakref <<EOF
+          [Flatpak Ref]
+          Name=$APP_ID
+          Branch=stable
+          Title=Klipp
+          Comment=Desktop soundboard with a quick overlay
+          Url=$REPO_URL
+          IsRuntime=false
+          RuntimeRepo=https://dl.flathub.org/repo/flathub.flatpakrepo
+          GPGKey=$public_key
+          EOF
+          touch pages/.nojekyll
+
+      - name: Push GitHub Pages branch
+        env:
+          RELEASE_TAG: ${{ github.event.release.tag_name || inputs.tag }}
+        run: |
+          cd pages
+          git add --all
+          if git diff --cached --quiet; then
+            echo 'Repository already contains this release.'
+            exit 0
+          fi
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git commit -m "Publish Flatpak ${RELEASE_TAG}"
+          git push origin HEAD:gh-pages
