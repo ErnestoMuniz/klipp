@@ -1,0 +1,7 @@
+[Flatpak Repo]
+Title=Klipp
+Comment=Official Klipp Flatpak repository
+Url=https://ernestomuniz.github.io/klipp/repo
+Homepage=https://github.com/ErnestoMuniz/klipp
+Icon=https://raw.githubusercontent.com/ErnestoMuniz/klipp/main/public/logo.png
+GPGKey=mDMEalaazBYJKwYBBAHaRw8BAQdA158X8sBWPW7NEO8X190vB3zjmlQE9tjn2ZLAtbAtZFS0SUtsaXBwIEZsYXRwYWsgUmVwb3NpdG9yeSA8MjU4MzI3NDYrRXJuZXN0b011bml6QHVzZXJzLm5vcmVwbHkuZ2l0aHViLmNvbT6IkAQTFgoAOBYhBChElex8Uc6B2aA6T26BmyTWrdR4BQJqVprMAhsDBQsJCAcCBhUKCQgLAgQWAgMBAh4BAheAAAoJEG6BmyTWrdR4Q/oA/12dBDdZMfE6BuE9go3VcoBcBLYEHb1RFzeU4d/6O7u2AP4mCCpqE6nXiiCsL3BzRbWD20bM7bSKtT8fgexUtz9RAQ==
