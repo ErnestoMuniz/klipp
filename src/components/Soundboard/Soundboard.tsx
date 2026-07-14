@@ -386,6 +386,9 @@ function Soundboard() {
         open={onlineOpen}
         onLibraryChanged={setState}
         onClose={() => setOnlineOpen(false)}
+        volume={volume}
+        muted={muted}
+        privateOutputLabel={state?.defaultSinkDescription ?? ""}
       />
 
       <SettingsDrawer

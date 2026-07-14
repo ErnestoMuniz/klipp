@@ -12,6 +12,11 @@ interface OnlineSoundsProps {
   onLibraryChanged: (state: AudioState) => void;
   /** Close the drawer (backdrop click / close button). */
   onClose: () => void;
+  /** Library playback volume; previews use the same level. */
+  volume: number;
+  muted: boolean;
+  /** Physical output to use instead of the clips sink feeding the virtual mic. */
+  privateOutputLabel: string;
 }
 
 /**
@@ -25,7 +30,14 @@ interface OnlineSoundsProps {
  * userData sounds dir via the main process and hands the refreshed library
  * state back to the parent.
  */
-export function OnlineSounds({ open, onLibraryChanged, onClose }: OnlineSoundsProps) {
+export function OnlineSounds({
+  open,
+  onLibraryChanged,
+  onClose,
+  volume,
+  muted,
+  privateOutputLabel,
+}: OnlineSoundsProps) {
   const { t } = useI18n();
   const api = window.soundsBrowser;
 
@@ -68,6 +80,10 @@ export function OnlineSounds({ open, onLibraryChanged, onClose }: OnlineSoundsPr
     [],
   );
 
+  useEffect(() => {
+    if (audioRef.current) audioRef.current.volume = muted ? 0 : volume;
+  }, [muted, volume]);
+
   // Run a fresh search whenever the committed query changes (or the drawer
   // opens with one already set).
   useEffect(() => {
@@ -103,7 +119,7 @@ export function OnlineSounds({ open, onLibraryChanged, onClose }: OnlineSoundsPr
       });
   }, [open, query, api]);
 
-  function togglePreview(sound: RemoteSound): void {
+  async function togglePreview(sound: RemoteSound): Promise<void> {
     const element = audioRef.current;
     if (element && previewing === sound.url) {
       element.pause();
@@ -115,6 +131,7 @@ export function OnlineSounds({ open, onLibraryChanged, onClose }: OnlineSoundsPr
     audioRef.current = null;
 
     const next = new Audio(sound.url);
+    next.volume = muted ? 0 : volume;
     next.onended = () => {
       if (audioRef.current === next) audioRef.current = null;
       setPreviewing(null);
@@ -125,7 +142,23 @@ export function OnlineSounds({ open, onLibraryChanged, onClose }: OnlineSoundsPr
     };
     audioRef.current = next;
     setPreviewing(sound.url);
-    void next.play().catch(() => setPreviewing(null));
+    try {
+      // The app-wide PULSE_SINK points at the virtual-mic clips sink. Select
+      // the user's real default output explicitly so cloud browsing is private.
+      const outputs = (await navigator.mediaDevices.enumerateDevices()).filter(
+        (device) => device.kind === "audiooutput",
+      );
+      const normalizedLabel = privateOutputLabel.toLocaleLowerCase();
+      const output = outputs.find((device) =>
+        device.label.toLocaleLowerCase().includes(normalizedLabel),
+      );
+      if (!output) throw new Error(`Private audio output not found: ${privateOutputLabel}`);
+      await next.setSinkId(output.deviceId);
+      await next.play();
+    } catch {
+      if (audioRef.current === next) audioRef.current = null;
+      setPreviewing(null);
+    }
   }
 
   async function loadMore(): Promise<void> {
@@ -269,7 +302,7 @@ export function OnlineSounds({ open, onLibraryChanged, onClose }: OnlineSoundsPr
                   variant="quietIcon"
                   size="sm"
                   className="size-9 shrink-0"
-                  onClick={() => togglePreview(sound)}
+                  onClick={() => void togglePreview(sound)}
                   aria-pressed={isPreviewing}
                   aria-label={isPreviewing ? t("online.pause") : t("online.preview")}
                   title={isPreviewing ? t("online.pause") : t("online.preview")}

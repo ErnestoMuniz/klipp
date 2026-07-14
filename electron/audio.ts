@@ -164,6 +164,7 @@ export interface AudioState {
   micPassthrough: boolean;
   hearClips: boolean;
   defaultSink: string;
+  defaultSinkDescription: string;
   sounds: SoundFile[];
 }
 
@@ -225,17 +226,17 @@ function parseSources(output: string): MicSource[] {
   return result;
 }
 
-function sourceDescription(output: string, sourceName: string): string {
+function deviceDescription(output: string, deviceName: string, kind: "Source" | "Sink"): string {
   const blocks = output.split(/\n\s*\n/);
   for (const block of blocks) {
-    if (!block.startsWith("Source #")) continue;
+    if (!block.startsWith(`${kind} #`)) continue;
     const nameMatch = /\n\tName: (.+)/.exec(block);
-    if (nameMatch && nameMatch[1].trim() === sourceName) {
+    if (nameMatch && nameMatch[1].trim() === deviceName) {
       const descMatch = /\n\tDescription: (.+)/.exec(block);
-      return descMatch ? descMatch[1].trim() : sourceName;
+      return descMatch ? descMatch[1].trim() : deviceName;
     }
   }
-  return sourceName;
+  return deviceName;
 }
 
 export class AudioManager {
@@ -251,6 +252,7 @@ export class AudioManager {
   micPassthrough = false;
   hearClips = true;
   defaultSink = "";
+  defaultSinkDescription = "";
   discordDeviceName = VIRTUAL_MIC_DESCRIPTION;
   sounds: SoundFile[] = [];
   private soundMetadata: StoredSoundMetadata = {};
@@ -280,6 +282,7 @@ export class AudioManager {
       micPassthrough: this.micPassthrough,
       hearClips: this.hearClips,
       defaultSink: this.defaultSink,
+      defaultSinkDescription: this.defaultSinkDescription,
       sounds: this.sounds,
     };
   }
@@ -288,6 +291,11 @@ export class AudioManager {
     try {
       await this.ensureGraph();
       this.defaultSink = (await runPactl(["get-default-sink"])).trim();
+      this.defaultSinkDescription = deviceDescription(
+        await runPactl(["list", "sinks"]),
+        this.defaultSink,
+        "Sink",
+      );
       const defaultSource = (await runPactl(["get-default-source"])).trim();
       this.micSources = await this.listMicSources();
 
@@ -308,9 +316,10 @@ export class AudioManager {
       await this.applyHearClips();
       this.soundMetadata = await loadSoundMetadata();
       this.sounds = await this.listSounds();
-      this.discordDeviceName = sourceDescription(
+      this.discordDeviceName = deviceDescription(
         await runPactl(["list", "sources"]),
         VIRTUAL_MIC_NAME,
+        "Source",
       );
       this.ready = true;
       this.error = null;

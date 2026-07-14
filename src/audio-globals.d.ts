@@ -31,6 +31,7 @@ export interface AudioState {
   micPassthrough: boolean;
   hearClips: boolean;
   defaultSink: string;
+  defaultSinkDescription: string;
   sounds: SoundFile[];
 }
 

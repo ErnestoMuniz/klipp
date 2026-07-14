@@ -44,6 +44,7 @@ export const emptyState: AudioState = {
   micPassthrough: false,
   hearClips: true,
   defaultSink: "",
+  defaultSinkDescription: "",
   sounds: [],
 };
 
