@@ -259,14 +259,14 @@ export function OnlineSounds({
               <Button
                 variant="quietIcon"
                 size="sm"
-                className="size-6 rounded-full border-0 bg-(--border) shadow-none hover:bg-(--accent) hover:text-(--accent-ink)"
+                className="size-6 rounded-full border-0 bg-(--border) shadow-none hover:text-(--accent)"
                 onClick={() => {
                   setQueryInput("");
                   setQuery("");
                 }}
                 aria-label={t("toolbar.clearSearch")}
               >
-                <X size={11} />
+                <X size={14} />
               </Button>
             )}
           </div>
@@ -294,7 +294,7 @@ export function OnlineSounds({
               <div
                 key={sound.url}
                 className={cx(
-                  "mb-2 flex items-center gap-2.5 rounded-md border border-(--border) bg-[linear-gradient(180deg,var(--surface-raise),var(--surface))] px-3 py-2 shadow-(--inset-hi) transition-colors hover:border-(--accent-border)",
+                  "mb-2 flex items-center gap-2.5 rounded-md bg-(--surface-raise) px-3 py-2 shadow-(--inset-hi) transition-colors hover:border-(--accent-border)",
                   isDownloaded && "border-(--accent-border)",
                 )}
               >
@@ -318,8 +318,8 @@ export function OnlineSounds({
                 </span>
 
                 <Button
-                  variant="secondary"
-                  className="size-9 shrink-0 p-0"
+                  variant="transport"
+                  className="size-9 shrink-0"
                   onClick={() => void download(sound)}
                   disabled={isDownloading || isDownloaded}
                   aria-label={isDownloaded ? t("online.downloaded") : t("online.download")}

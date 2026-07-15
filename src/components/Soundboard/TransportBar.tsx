@@ -26,7 +26,7 @@ export function TransportBar({
   const { t } = useI18n();
 
   return (
-    <footer className="fixed bottom-6 left-1/2 z-10 flex w-[min(1040px,calc(100%-48px))] -translate-x-1/2 items-center gap-3.5 rounded-lg border border-(--border) bg-[linear-gradient(180deg,var(--surface-raise),var(--surface))] px-3.5 py-3 shadow-[var(--shadow-md),var(--inset-hi)] backdrop-blur-[14px] backdrop-saturate-[1.1] max-sm:flex-wrap max-sm:gap-3">
+    <footer className="fixed bottom-6 left-1/2 z-10 flex w-[min(1040px,calc(100%-48px))] -translate-x-1/2 items-center gap-3.5 rounded-lg border border-(--border) bg-[linear-gradient(180deg,var(--surface-raise),var(--surface))] pl-3.5 pr-6 py-3 shadow-[var(--shadow-md),var(--inset-hi)] backdrop-blur-[14px] backdrop-saturate-[1.1] max-sm:flex-wrap max-sm:gap-3">
       <Button
         variant="transport"
         size="lg"
