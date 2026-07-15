@@ -41,6 +41,7 @@ export interface AudioApi {
   setMicPassthrough: (enabled: boolean) => Promise<AudioState>;
   setHearClips: (enabled: boolean) => Promise<AudioState>;
   addSounds: () => Promise<AudioState>;
+  openSoundsFolder: () => Promise<void>;
   deleteSound: (url: string) => Promise<AudioState>;
   importSounds: (files: File[]) => Promise<AudioState>;
   relistSounds: () => Promise<AudioState>;

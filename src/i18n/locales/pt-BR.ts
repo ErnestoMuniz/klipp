@@ -104,6 +104,7 @@ export const ptBR: Messages = {
     "Quando desativado, fechar a janela principal encerra o Klipp em vez de o esconder para a bandeja.",
   "settings.hearClipsLabel":
     "Ouvir os áudios nos meus fones/caixas (só os áudios, sem a minha voz)",
+  "settings.openSoundsFolder": "Abrir pasta de áudios",
   "settings.themeGroup": "Tema",
   "settings.themeLight": "Claro",
   "settings.themeDark": "Escuro",

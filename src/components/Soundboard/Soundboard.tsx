@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Plus } from "lucide-react";
+import { FolderOpen, Plus } from "lucide-react";
 import type { AudioApi, AudioState, SoundFile, SoundMetadata } from "../../audio-globals";
 import { BrandLogo } from "./BrandLogo";
 import { ErrorBanner } from "./ErrorBanner";
@@ -428,6 +428,17 @@ function Soundboard() {
           setVolume(nextVolume);
         }}
       />
+
+      <Button
+        variant="secondary"
+        className="fixed right-7 bottom-45 z-10 size-12 gap-0 rounded-full! p-0 shadow-[var(--shadow-lg),var(--inset-hi)]"
+        onClick={() => void window.audio?.openSoundsFolder()}
+        disabled={disabled || !window.audio}
+        aria-label={t("settings.openSoundsFolder")}
+        title={t("settings.openSoundsFolder")}
+      >
+        <FolderOpen size={22} aria-hidden="true" />
+      </Button>
 
       <Button
         variant="primary"

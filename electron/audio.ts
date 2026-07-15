@@ -1,5 +1,5 @@
 import { execFile } from "node:child_process";
-import { app, dialog, ipcMain, protocol } from "electron";
+import { app, dialog, ipcMain, protocol, shell } from "electron";
 import fs from "node:fs/promises";
 import { createReadStream, watch, type FSWatcher } from "node:fs";
 import path from "node:path";
@@ -478,6 +478,13 @@ export class AudioManager {
     return this.getState();
   }
 
+  async openSoundsFolder(): Promise<void> {
+    const dir = this.soundsDir();
+    await fs.mkdir(dir, { recursive: true });
+    const error = await shell.openPath(dir);
+    if (error) throw new Error(error);
+  }
+
   async watchSounds(onChange: (state: AudioState) => void): Promise<void> {
     const dir = this.soundsDir();
     await fs.mkdir(dir, { recursive: true });
@@ -731,6 +738,7 @@ export function registerAudioIpc(manager: AudioManager): void {
     manager.setHearClips(enabled),
   );
   ipcMain.handle("audio:add-sounds", async () => manager.addSounds());
+  ipcMain.handle("audio:open-sounds-folder", async () => manager.openSoundsFolder());
   ipcMain.handle("audio:delete-sound", async (_event, url: string) => manager.deleteSound(url));
   ipcMain.handle("audio:import-sounds", async (_event, files: string[]) =>
     manager.importSounds(files),

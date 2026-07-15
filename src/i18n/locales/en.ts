@@ -102,6 +102,7 @@ export const en = {
     "When off, closing the main window quits Klipp instead of hiding it to the tray.",
   "settings.hearClipsLabel":
     "Hear the sounds in my headphones/speakers (just the sounds, not my voice)",
+  "settings.openSoundsFolder": "Open sounds folder",
   "settings.themeGroup": "Theme",
   "settings.themeLight": "Light",
   "settings.themeDark": "Dark",
