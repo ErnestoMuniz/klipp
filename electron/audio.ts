@@ -182,17 +182,11 @@ interface LoadedModule {
 }
 
 function runPactl(args: string[]): Promise<string> {
-  // The Flatpak runtime intentionally does not expose the host's PulseAudio
-  // command-line client. Run it on the host through Flatpak's documented
-  // bridge so the virtual devices are created in the user's real audio graph.
-  // Outside Flatpak, retain the direct invocation used during development and
-  // by non-sandboxed packages.
-  const isFlatpak = Boolean(process.env.FLATPAK_ID);
-  const command = isFlatpak ? "flatpak-spawn" : "pactl";
-  const commandArgs = isFlatpak ? ["--host", "pactl", ...args] : args;
-
+  // org.freedesktop.Platform includes pactl. Inside Flatpak it talks to the
+  // host's PulseAudio/PipeWire server through the exposed PulseAudio socket,
+  // so the host does not need to provide the command-line client.
   return new Promise((resolve, reject) => {
-    execFile(command, commandArgs, { timeout: 5000 }, (err, stdout, stderr) => {
+    execFile("pactl", args, { timeout: 5000 }, (err, stdout, stderr) => {
       if (err) {
         reject(new Error(stderr.trim() || err.message));
         return;
