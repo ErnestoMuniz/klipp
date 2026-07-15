@@ -28,6 +28,12 @@ import {
   registerSettingsIpc,
   type AppSettings,
 } from "./appSettings";
+import {
+  DEFAULT_WINDOW_STATE,
+  loadWindowState,
+  trackWindowState,
+  type WindowState,
+} from "./windowState";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -87,6 +93,7 @@ let activeOverlayDisplayId: number | null = null;
 // startup and updated live whenever the renderer changes them; the close
 // handler reads `runInBackground` to decide whether to hide or quit.
 let currentSettings: AppSettings = DEFAULT_SETTINGS;
+let currentWindowState: WindowState = DEFAULT_WINDOW_STATE;
 
 interface OverlayView {
   displayId: number;
@@ -118,8 +125,8 @@ function createWindow(): void {
 
   win = new BrowserWindow({
     icon,
-    width: 900,
-    height: 720,
+    width: currentWindowState.width,
+    height: currentWindowState.height,
     // Frameless window so the renderer owns the whole chrome (custom
     // macOS-style traffic-light buttons live in the Topbar). On macOS
     // `titleBarStyle: "hidden"" keeps a draggable title bar region but
@@ -153,8 +160,11 @@ function createWindow(): void {
     app.quit();
   });
 
+  trackWindowState(win, currentWindowState);
   win.on("maximize", () => win?.webContents.send("window:maximized", true));
   win.on("unmaximize", () => win?.webContents.send("window:maximized", false));
+
+  if (currentWindowState.maximized) win.maximize();
 
   win.webContents.on("did-finish-load", () => {
     win?.webContents.send("main-process-message", new Date().toLocaleString());
@@ -615,6 +625,7 @@ void app.whenReady().then(async () => {
   // Load app-level preferences before creating windows so the close handler
   // already reflects the user's "run in background" choice on first close.
   currentSettings = await loadAppSettings();
+  currentWindowState = await loadWindowState();
 
   registerSoundProtocol();
   registerAudioIpc(audio);
