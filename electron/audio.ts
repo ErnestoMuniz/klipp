@@ -120,20 +120,20 @@ async function saveSoundMetadata(metadata: StoredSoundMetadata): Promise<void> {
 // Clips-only sink. The renderer plays soundboard clips here (via PULSE_SINK).
 // Keeping clips isolated from the mic lets us send ONLY clips to the user's
 // speakers without their own voice leaking back.
-const CLIPS_SINK_NAME = "soundboard-clips";
-const CLIPS_SINK_DESCRIPTION = "Soundboard-Clips";
+const CLIPS_SINK_NAME = "klipp-clips";
+const CLIPS_SINK_DESCRIPTION = "Klipp-Clips";
 
 // Mixing bus: receives clips (via a loopback) and the real mic (via a
 // loopback). Its monitor feeds the virtual microphone, so Discord hears both.
-const MIX_SINK_NAME = "soundboard-mix";
-const MIX_SINK_DESCRIPTION = "Soundboard-Mix";
+const MIX_SINK_NAME = "klipp-mix";
+const MIX_SINK_DESCRIPTION = "Klipp-Mix";
 
 // Virtual microphone exposed to Discord. Created with module-remap-source so it
 // is a real Audio/Source (media.class = "Audio/Source") instead of a sink
 // monitor, which Discord would classify as an output device. Discord must pick
 // this as its INPUT device.
 const VIRTUAL_MIC_NAME = "soundboard-mic";
-const VIRTUAL_MIC_DESCRIPTION = "Soundboard-Mic";
+const VIRTUAL_MIC_DESCRIPTION = "Klipp-Mic";
 
 const SOUNDS_SUBDIR = "sounds";
 const AUDIO_EXTS = new Set(["mp3", "wav", "ogg", "flac", "m4a", "opus", "webm", "aac"]);
@@ -345,7 +345,7 @@ export class AudioManager {
         "load-module",
         "module-null-sink",
         `sink_name=${CLIPS_SINK_NAME}`,
-        `sink_properties=device.description=${CLIPS_SINK_DESCRIPTION}`,
+        `sink_properties=device.description=${CLIPS_SINK_DESCRIPTION} device.intended_roles=filter`,
       ]);
       this.loaded.push({ kind: "clips-sink", index: idx.trim() });
     }
@@ -355,7 +355,7 @@ export class AudioManager {
         "load-module",
         "module-null-sink",
         `sink_name=${MIX_SINK_NAME}`,
-        `sink_properties=device.description=${MIX_SINK_DESCRIPTION}`,
+        `sink_properties=device.description=${MIX_SINK_DESCRIPTION} device.intended_roles=filter`,
       ]);
       this.loaded.push({ kind: "mix-sink", index: idx.trim() });
     }
