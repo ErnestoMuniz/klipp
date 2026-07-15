@@ -315,7 +315,7 @@ function Soundboard() {
     <section
       id="soundboard"
       className={cx(
-        "relative z-1 mx-auto flex min-h-svh w-full flex-col gap-4 px-6 pb-32 text-left max-sm:px-3.5 max-sm:pb-36",
+        "relative z-1 mx-auto flex h-svh w-full flex-col overflow-hidden px-6 text-left max-sm:px-3.5",
       )}
       onDragEnter={(event) => {
         if (!event.dataTransfer.types.includes("Files")) return;
@@ -341,48 +341,50 @@ function Soundboard() {
       )}
       <Topbar />
 
-      {soundboardState.error && (
-        <ErrorBanner
+      <div className="sb-scroll -mr-6 flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto pt-4 pr-6 pb-32 max-sm:-mr-3.5 max-sm:pr-3.5 max-sm:pb-36">
+        {soundboardState.error && (
+          <ErrorBanner
+            disabled={disabled}
+            error={soundboardState.error}
+            onRetry={() => void refresh()}
+          />
+        )}
+
+        <LibraryToolbar
+          density={prefs.density}
+          prefs={prefs}
+          query={query}
+          onlineOpen={onlineOpen}
+          settingsOpen={settingsOpen}
+          soundCount={soundCount}
+          visibleCount={visibleCount}
+          onPrefsChange={setPrefs}
+          onQueryChange={setQuery}
+          onOnlineToggle={() => setOnlineOpen((value) => !value)}
+          onSettingsToggle={() => setSettingsOpen((value) => !value)}
+        />
+
+        {prefs.showHints && soundCount > 0 && (
+          <ShortcutBanner
+            shortcut={shortcut}
+            onDismiss={() => setPrefs((current) => ({ ...current, showHints: false }))}
+          />
+        )}
+
+        <SoundStage
+          density={prefs.density}
           disabled={disabled}
-          error={soundboardState.error}
-          onRetry={() => void refresh()}
+          playing={playing}
+          query={query}
+          sounds={filtered}
+          totalSounds={soundCount}
+          onAddSounds={() => void onAddSounds()}
+          onDelete={(sound) => void onDeleteSound(sound)}
+          onEdit={setEditingSound}
+          onPlay={play}
+          onToggleOverlay={(sound) => void onToggleOverlay(sound)}
         />
-      )}
-
-      <LibraryToolbar
-        density={prefs.density}
-        prefs={prefs}
-        query={query}
-        onlineOpen={onlineOpen}
-        settingsOpen={settingsOpen}
-        soundCount={soundCount}
-        visibleCount={visibleCount}
-        onPrefsChange={setPrefs}
-        onQueryChange={setQuery}
-        onOnlineToggle={() => setOnlineOpen((value) => !value)}
-        onSettingsToggle={() => setSettingsOpen((value) => !value)}
-      />
-
-      {prefs.showHints && soundCount > 0 && (
-        <ShortcutBanner
-          shortcut={shortcut}
-          onDismiss={() => setPrefs((current) => ({ ...current, showHints: false }))}
-        />
-      )}
-
-      <SoundStage
-        density={prefs.density}
-        disabled={disabled}
-        playing={playing}
-        query={query}
-        sounds={filtered}
-        totalSounds={soundCount}
-        onAddSounds={() => void onAddSounds()}
-        onDelete={(sound) => void onDeleteSound(sound)}
-        onEdit={setEditingSound}
-        onPlay={play}
-        onToggleOverlay={(sound) => void onToggleOverlay(sound)}
-      />
+      </div>
 
       <SoundEditor
         disabled={disabled}
