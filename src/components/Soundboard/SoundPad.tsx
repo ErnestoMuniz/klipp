@@ -165,8 +165,8 @@ export function SoundPad({
       </span>
       <span
         className={cx(
-          "min-w-0 wrap-break-word text-sm font-medium leading-tight text-(--text-h) [display:-webkit-box] [-webkit-box-orient:vertical] overflow-hidden",
-          density === "comfort" ? "line-clamp-2 shrink-0" : "flex-1 [-webkit-line-clamp:1]",
+          "min-w-0 truncate text-sm font-medium leading-tight text-(--text-h)",
+          density === "comfort" ? "shrink-0" : "flex-1",
           !sound.inOverlay && "text-(--text-faint) font-normal",
         )}
       >
