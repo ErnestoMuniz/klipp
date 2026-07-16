@@ -48,6 +48,11 @@ contextBridge.exposeInMainWorld("appSettings", {
   set: (patch: Record<string, unknown>) => ipcRenderer.invoke("app-settings:set", patch),
 });
 
+contextBridge.exposeInMainWorld("appInfo", {
+  getVersion: () => ipcRenderer.invoke("app-info:get-version"),
+  openExternal: (url: string) => ipcRenderer.invoke("app-info:open-external", url),
+});
+
 contextBridge.exposeInMainWorld("windowControls", {
   minimize: () => ipcRenderer.send("window:minimize"),
   toggleMaximize: () => ipcRenderer.send("window:toggle-maximize"),

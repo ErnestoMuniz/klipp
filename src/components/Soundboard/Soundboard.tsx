@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { FolderOpen, Plus } from "lucide-react";
 import type { AudioApi, AudioState, SoundFile, SoundMetadata } from "../../audio-globals";
+import { AboutDialog } from "./AboutDialog";
 import { BrandLogo } from "./BrandLogo";
 import { ErrorBanner } from "./ErrorBanner";
 import { LibraryToolbar } from "./LibraryToolbar";
@@ -31,6 +32,7 @@ function Soundboard() {
   const [theme, setTheme] = useState<Theme>(prefs.theme);
   const [fatal, setFatal] = useState<string | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [aboutOpen, setAboutOpen] = useState(false);
   const [onlineOpen, setOnlineOpen] = useState(false);
   const [draggingSounds, setDraggingSounds] = useState(false);
   const [editingSound, setEditingSound] = useState<SoundFile | null>(null);
@@ -402,6 +404,8 @@ function Soundboard() {
         privateOutputLabel={state?.defaultSinkDescription ?? ""}
       />
 
+      <AboutDialog open={aboutOpen} onClose={() => setAboutOpen(false)} />
+
       <SettingsDrawer
         disabled={disabled}
         open={settingsOpen}
@@ -416,6 +420,10 @@ function Soundboard() {
         onThemeChange={setTheme}
         onShortcutChange={setShortcut}
         onRunInBackgroundChange={(enabled) => void setAppSettings({ runInBackground: enabled })}
+        onAbout={() => {
+          setSettingsOpen(false);
+          setAboutOpen(true);
+        }}
       />
 
       <TransportBar

@@ -76,6 +76,11 @@ export interface IpcRendererApi {
   invoke: <T = unknown>(channel: string, ...args: unknown[]) => Promise<T>;
 }
 
+export interface AppInfoApi {
+  getVersion: () => Promise<string>;
+  openExternal: (url: string) => Promise<void>;
+}
+
 export interface WindowControlsApi {
   minimize: () => void;
   toggleMaximize: () => void;
@@ -126,6 +131,7 @@ declare global {
     overlay?: OverlayApi;
     shortcut?: ShortcutApi;
     appSettings?: AppSettingsApi;
+    appInfo?: AppInfoApi;
     windowControls?: WindowControlsApi;
     soundsBrowser?: SoundsBrowserApi;
   }

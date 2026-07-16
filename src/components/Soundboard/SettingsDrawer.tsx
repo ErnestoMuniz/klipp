@@ -1,4 +1,4 @@
-import { Globe, Moon, Sun, SunMoon, X } from "lucide-react";
+import { CircleHelp, Globe, Moon, Sun, SunMoon, X } from "lucide-react";
 import type { AudioState } from "../../audio-globals";
 import { DEFAULT_SHORTCUT } from "./types";
 import type { Theme } from "./types";
@@ -22,6 +22,7 @@ interface SettingsDrawerProps {
   onThemeChange: (theme: Theme) => void;
   onShortcutChange: (accelerator: string) => Promise<{ registered: boolean; error?: string }>;
   onRunInBackgroundChange: (enabled: boolean) => void;
+  onAbout: () => void;
 }
 
 export function SettingsDrawer({
@@ -38,6 +39,7 @@ export function SettingsDrawer({
   onThemeChange,
   onShortcutChange,
   onRunInBackgroundChange,
+  onAbout,
 }: SettingsDrawerProps) {
   const { t, language, setLanguage } = useI18n();
 
@@ -197,6 +199,17 @@ export function SettingsDrawer({
               </p>
             </FieldGroup>
           </div>
+
+          <div className={dividerClass} />
+
+          <Button
+            variant="secondary"
+            className="inline-flex h-10 w-full shrink-0 items-center justify-center gap-2 py-0"
+            onClick={onAbout}
+          >
+            <CircleHelp size={18} aria-hidden="true" />
+            {t("settings.about")}
+          </Button>
         </div>
       </aside>
     </>

@@ -124,6 +124,17 @@ export const en = {
   "settings.languageSystem": "System",
   "settings.languageEn": "English",
   "settings.languagePtBR": "Português (Brasil)",
+  "settings.about": "About Klipp",
+
+  "about.title": "About Klipp",
+  "about.closeAria": "Close about dialog",
+  "about.version": "Version {version}",
+  "about.description":
+    "A desktop soundboard that keeps your clips close and lets you play them anywhere through a quick overlay.",
+  "about.creator": "Created by",
+  "about.platform": "Platform",
+  "about.technology": "Built with",
+  "about.github": "View project on GitHub",
 
   "online.title": "Browse sounds online",
   "online.closeAria": "Close online sounds",

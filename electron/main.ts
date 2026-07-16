@@ -8,6 +8,7 @@ import {
   nativeImage,
   protocol,
   screen,
+  shell,
   type Display,
 } from "electron";
 import path from "node:path";
@@ -599,6 +600,10 @@ ipcMain.on("window:close", () => {
   if (!win) return;
   isQuitting = false;
   win.close();
+});
+ipcMain.handle("app-info:get-version", () => app.getVersion());
+ipcMain.handle("app-info:open-external", (_event, url: unknown) => {
+  if (url === "https://github.com/ErnestoMuniz/klipp") return shell.openExternal(url);
 });
 
 // Set app name early so Linux window managers can match the .desktop file icon

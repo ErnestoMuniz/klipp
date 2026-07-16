@@ -125,6 +125,17 @@ export const ptBR: Messages = {
   "settings.languageSystem": "Sistema",
   "settings.languageEn": "English",
   "settings.languagePtBR": "Português (Brasil)",
+  "settings.about": "Sobre o Klipp",
+
+  "about.title": "Sobre o Klipp",
+  "about.closeAria": "Fechar diálogo sobre o app",
+  "about.version": "Versão {version}",
+  "about.description":
+    "Um soundboard para desktop que mantém os seus áudios por perto e permite reproduzi-los em qualquer lugar através de um seletor rápido.",
+  "about.creator": "Criado por",
+  "about.platform": "Plataforma",
+  "about.technology": "Criado com",
+  "about.github": "Ver projeto no GitHub",
 
   "online.title": "Pesquisar áudios online",
   "online.closeAria": "Fechar busca online",
