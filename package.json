@@ -3,6 +3,7 @@
   "version": "1.2.0",
   "private": true,
   "description": "Desktop soundboard with a quick overlay and virtual microphone routing.",
+  "license": "GPL-3.0-only",
   "author": "Ernesto Muniz",
   "type": "module",
   "main": "dist-electron/main.js",

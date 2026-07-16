@@ -69,3 +69,12 @@ flatpak uninstall io.github.ErnestoMuniz.Klipp
 
 Application data is kept under `~/.var/app/io.github.ErnestoMuniz.Klipp/` unless
 you explicitly choose to remove it.
+
+## License
+
+Copyright (C) 2026 Ernesto Muniz.
+
+Klipp, including versions published before the addition of this notice, is
+licensed under the [GNU General Public License version 3](LICENSE). See the
+license for the terms under which you may use, modify, and redistribute the
+software. Klipp is provided without any warranty.
