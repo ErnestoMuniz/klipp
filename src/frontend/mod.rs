@@ -1,0 +1,20 @@
+pub mod about;
+pub mod assets;
+pub mod browse;
+pub mod editor;
+pub mod emoji;
+pub mod format;
+pub mod icons;
+pub mod library;
+pub mod main_window;
+pub mod overlay;
+pub mod pie;
+pub mod player;
+pub mod settings;
+pub mod theme;
+pub mod titlebar;
+pub mod toolbar;
+pub mod ui;
+
+pub use assets::AppAssets;
+pub use main_window::MainWindow;
