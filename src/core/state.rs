@@ -41,7 +41,19 @@ pub struct Shared {
     pub mic_open: bool,
     pub last_error: Option<String>,
     pub overlay_active: bool,
+    /// Âncora do pie em coordenadas globais do desktop (soma de todos os
+    /// displays). Cada janela de overlay converte para seu espaço local.
     pub overlay_anchor: Option<(f32, f32)>,
+    /// A âncora veio do XWayland (aproximada: layout/escala do X podem
+    /// divergir do Wayland). O primeiro mouse_move real confirma a posição
+    /// exata e limpa o flag.
+    pub anchor_needs_confirm: bool,
+    /// Valor bruto do XWayland usado na âncora (para calibrar o offset
+    /// X→Wayland no primeiro evento real).
+    pub anchor_x: Option<(f32, f32)>,
+    /// Offset calibrado X→Wayland (wayland - x). Aprendido no primeiro uso
+    /// e reaplicado nas próximas ativações: dispensa o "jiggle".
+    pub cursor_calib: Option<(f32, f32)>,
     pub pie_hovered: Option<usize>,
     pub play_request: Option<String>,
     pub confirm_request: bool,
@@ -138,6 +150,9 @@ impl Shared {
             last_error: None,
             overlay_active: false,
             overlay_anchor: None,
+            anchor_needs_confirm: false,
+            anchor_x: None,
+            cursor_calib: None,
             pie_hovered: None,
             play_request: None,
             confirm_request: false,
