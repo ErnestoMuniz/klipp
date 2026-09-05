@@ -142,15 +142,24 @@ pub async fn run(shared: Arc<std::sync::Mutex<Shared>>, preferred: String) -> an
                 let Some(event) = event else { break };
                 log::info!("atalho activated: {}", event.shortcut_id());
                 if event.shortcut_id() == OVERLAY_ID {
-                    // Posição do cursor via XWayland + offset calibrado: o pie
-                    // já abre no monitor certo, perto do cursor. O primeiro
-                    // mouse_move real confirma a posição exata (e aprende o
-                    // offset). Sem XWayland, None + fallback (primário).
-                    let x = crate::backend::cursor::pointer();
+                    // Posição do cursor via display X sondado + offset
+                    // calibrado: o pie já abre no monitor certo. Antes da
+                    // sonda (ou sem XWayland útil), None + fallback.
+                    let (probed, x_display, calib) = {
+                        let s = shared.lock().unwrap();
+                        (s.x_probed, s.x_display.clone(), s.cursor_calib)
+                    };
+                    let x = if probed {
+                        x_display
+                            .as_deref()
+                            .and_then(|d| crate::backend::cursor::pointer_on(Some(d)))
+                    } else {
+                        None
+                    };
                     log::info!("atalho cursor: {x:?}");
                     log::info!("atalho opts: {:?}", event.options());
                     set_shared(&shared, |s| {
-                        let (ox, oy) = s.cursor_calib.unwrap_or((0.0, 0.0));
+                        let (ox, oy) = calib.unwrap_or((0.0, 0.0));
                         let anchor = x.map(|p| (p.0 + ox, p.1 + oy));
                         s.overlay_active = true;
                         s.overlay_anchor = anchor;

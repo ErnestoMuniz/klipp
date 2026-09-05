@@ -101,6 +101,30 @@ impl MainWindow {
         // (a enumeração Wayland pode chegar incompleta na largada).
         entity.ensure_overlays(cx);
 
+        // Sonda do display X (uma vez, em background): escolhe o XWayland
+        // pelo tamanho da raiz. O atalho usa o resultado para ancorar.
+        let shared_x = entity.shared.clone();
+        std::thread::Builder::new()
+            .name("klipp-xprobe".into())
+            .spawn(move || {
+                let mut size = None;
+                for _ in 0..100 {
+                    size = shared_x.lock().unwrap().desktop_size;
+                    if size.is_some() {
+                        break;
+                    }
+                    std::thread::sleep(std::time::Duration::from_millis(100));
+                }
+                if let Some(desktop) = size {
+                    let found = crate::backend::cursor::discover(desktop);
+                    let mut s = shared_x.lock().unwrap();
+                    s.x_display = found;
+                    s.x_probed = true;
+                    s.bump();
+                }
+            })
+            .ok();
+
         entity.spawn_background_tasks(cx);
         entity.spawn_poller(cx);
         entity.spawn_fs_watcher();
@@ -324,6 +348,30 @@ impl MainWindow {
     fn on_tick(&mut self, cx: &mut Context<Self>) {
         // Monitores que aparecem depois da largada ganham overlay aqui.
         self.ensure_overlays(cx);
+        // Tamanho combinado do desktop (para a sonda do display X).
+        {
+            let mut bounds: Option<(f32, f32, f32, f32)> = None;
+            for d in cx.displays() {
+                let b = d.bounds();
+                let x0 = f32::from(b.origin.x);
+                let y0 = f32::from(b.origin.y);
+                let x1 = x0 + f32::from(b.size.width);
+                let y1 = y0 + f32::from(b.size.height);
+                bounds = Some(match bounds {
+                    Some((ax0, ay0, ax1, ay1)) => {
+                        (ax0.min(x0), ay0.min(y0), ax1.max(x1), ay1.max(y1))
+                    }
+                    None => (x0, y0, x1, y1),
+                });
+            }
+            if let Some((x0, y0, x1, y1)) = bounds {
+                let size = ((x1 - x0).max(0.0) as u32, (y1 - y0).max(0.0) as u32);
+                let mut s = self.shared.lock().unwrap();
+                if s.desktop_size != Some(size) {
+                    s.desktop_size = Some(size);
+                }
+            }
+        }
         // Âncora aproximada? Fixa a exata assim que o cursor estiver sobre
         // um overlay (sem precisar de movimento).
         self.confirm_anchor_from_hover(cx);

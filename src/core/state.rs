@@ -54,6 +54,13 @@ pub struct Shared {
     /// Offset calibrado X→Wayland (wayland - x). Aprendido no primeiro uso
     /// e reaplicado nas próximas ativações: dispensa o "jiggle".
     pub cursor_calib: Option<(f32, f32)>,
+    /// Tamanho combinado do desktop (união dos displays), para escolher o
+    /// display X correto na sonda.
+    pub desktop_size: Option<(u32, u32)>,
+    /// Sonda do display X concluída (ver `x_display`).
+    pub x_probed: bool,
+    /// Display X vivo escolhido pela sonda (`None` = sem XWayland útil).
+    pub x_display: Option<String>,
     pub pie_hovered: Option<usize>,
     pub play_request: Option<String>,
     pub confirm_request: bool,
@@ -153,6 +160,9 @@ impl Shared {
             anchor_needs_confirm: false,
             anchor_x: None,
             cursor_calib: None,
+            desktop_size: None,
+            x_probed: false,
+            x_display: None,
             pie_hovered: None,
             play_request: None,
             confirm_request: false,
