@@ -42,7 +42,10 @@ pub struct MainWindow {
     pub(crate) shared: Arc<Mutex<Shared>>,
     pub(crate) engine: Arc<Engine>,
     graph: Arc<Mutex<AudioGraph>>,
-    overlay: Arc<Mutex<Option<WindowHandle<OverlayEntity>>>>,
+    overlay: Arc<Mutex<Vec<(WindowHandle<OverlayEntity>, Option<open_gpui::DisplayId>)>>>,
+    /// Entidades overlay (uma por janela): para repintar todos os monitores
+    /// quando o estado muda numa janela.
+    overlay_ids: Arc<Mutex<Vec<open_gpui::EntityId>>>,
     pub(crate) search_focus: FocusHandle,
     pub(crate) editor_focus: FocusHandle,
     pub(crate) editor_search_focus: FocusHandle,
@@ -67,18 +70,18 @@ impl MainWindow {
         shared: Arc<Mutex<Shared>>,
         engine: Arc<Engine>,
         graph: Arc<Mutex<AudioGraph>>,
-        assets: &Arc<AppAssets>,
+        _assets: &Arc<AppAssets>,
         cx: &mut Context<Self>,
     ) -> Self {
-        let overlay = Arc::new(Mutex::new(None));
-        let overlay_handle = overlay.clone();
-        let shared_bg = shared.clone();
+        let overlays = Arc::new(Mutex::new(Vec::new()));
+        let overlay_ids = Arc::new(Mutex::new(Vec::new()));
 
         let entity = Self {
             shared: shared.clone(),
             engine,
             graph,
-            overlay,
+            overlay: overlays,
+            overlay_ids,
             search_focus: cx.focus_handle(),
             editor_focus: cx.focus_handle(),
             editor_search_focus: cx.focus_handle(),
@@ -91,24 +94,145 @@ impl MainWindow {
             last_overlay_active: false,
         };
 
-        // Janela de overlay: LayerShell 1x1 (invisível); cresce na ativação.
-        cx.open_window(
-            overlay_options(WindowKind::LayerShell(default_layer_shell_options())),
-            |_window, cx| cx.new(|cx| OverlayEntity::new(shared_bg.clone(), assets, cx)),
-        )
-        .or_else(|_| {
-            // Compositor sem LayerShell: cai para uma janela xdg normal (PopUp).
-            cx.open_window(overlay_options(WindowKind::PopUp), |_window, cx| {
-                cx.new(|cx| OverlayEntity::new(shared_bg.clone(), assets, cx))
-            })
-        })
-        .map(|handle| *overlay_handle.lock().unwrap() = Some(handle))
-        .unwrap_or_else(|err| log::warn!("não foi possível criar a janela de overlay: {err}"));
+        // Um overlay fullscreen por display: o compositor fixa cada surface
+        // layer-shell num output — overlay único ficava preso no monitor
+        // errado sem receber o mouse do outro. 1x1 (invisível) até ativar.
+        // `ensure_overlays` (no tick) completa monitores que aparecem depois
+        // (a enumeração Wayland pode chegar incompleta na largada).
+        entity.ensure_overlays(cx);
 
         entity.spawn_background_tasks(cx);
         entity.spawn_poller(cx);
         entity.spawn_fs_watcher();
         entity
+    }
+
+    /// Garante um overlay por display (idempotente e silencioso quando
+    /// estável): cria só para displays sem janela e fecha janelas obsoletas
+    /// (ex. a transitória `None` da largada, quando a enumeração Wayland
+    /// ainda estava vazia).
+    fn ensure_overlays(&self, cx: &mut Context<Self>) {
+        use std::collections::HashSet;
+        let displays = cx.displays();
+        let want: HashSet<Option<open_gpui::DisplayId>> = if displays.is_empty() {
+            HashSet::from([None])
+        } else {
+            displays.iter().map(|d| Some(d.id())).collect()
+        };
+        // Fecha obsoletas fora do lock.
+        let stale: Vec<WindowHandle<OverlayEntity>> = {
+            let guard = self.overlay.lock().unwrap();
+            let have: HashSet<Option<open_gpui::DisplayId>> =
+                guard.iter().map(|(_, id)| *id).collect();
+            if have == want {
+                return;
+            }
+            guard
+                .iter()
+                .filter(|(_, id)| !want.contains(id))
+                .map(|(h, _)| h.clone())
+                .collect()
+        };
+        for handle in stale {
+            log::info!("overlay: fechando janela obsoleta");
+            let _ = handle.update(cx, |_, window, _| window.remove_window());
+            self.overlay
+                .lock()
+                .unwrap()
+                .retain(|(h, _)| h != &handle);
+        }
+        let missing: Vec<Option<open_gpui::DisplayId>> = {
+            let guard = self.overlay.lock().unwrap();
+            let have: HashSet<Option<open_gpui::DisplayId>> =
+                guard.iter().map(|(_, id)| *id).collect();
+            want.difference(&have).copied().collect()
+        };
+        if missing.is_empty() {
+            return;
+        }
+        let primary_id = cx
+            .primary_display()
+            .map(|d| d.id())
+            .or_else(|| displays.first().map(|d| d.id()));
+        log::info!("overlay: {} display(s)", displays.len());
+        for d in &displays {
+            log::info!("overlay: display {:?} bounds {:?}", d.id(), d.bounds());
+        }
+        for target in missing {
+            let is_fallback =
+                target == primary_id || (primary_id.is_none() && target.is_none());
+            if Self::open_overlay(
+                self.overlay.clone(),
+                self.overlay_ids.clone(),
+                self.shared.clone(),
+                target,
+                is_fallback,
+                cx,
+            )
+            .is_err()
+            {
+                break;
+            }
+        }
+    }
+
+    /// Abre uma janela de overlay para `target` e registra em `overlays`.
+    /// Retorna `Err` se nem LayerShell nem o fallback PopUp abriram.
+    fn open_overlay(
+        overlays: Arc<
+            Mutex<Vec<(WindowHandle<OverlayEntity>, Option<open_gpui::DisplayId>)>>,
+        >,
+        overlay_ids: Arc<Mutex<Vec<open_gpui::EntityId>>>,
+        shared: Arc<Mutex<Shared>>,
+        target: Option<open_gpui::DisplayId>,
+        is_fallback: bool,
+        cx: &mut Context<Self>,
+    ) -> anyhow::Result<()> {
+        let shared_layer = shared.clone();
+        let shared_popup = shared.clone();
+        let ids_layer = overlay_ids.clone();
+        let ids_popup = overlay_ids.clone();
+        let layer_opts = default_layer_shell_options();
+        cx.open_window(
+            overlay_options(WindowKind::LayerShell(layer_opts), target),
+            move |_window, cx| {
+                let e = cx.new(|cx| {
+                    OverlayEntity::new(shared_layer.clone(), ids_layer.clone(), target, is_fallback, cx)
+                });
+                let mut ids = ids_layer.lock().unwrap();
+                if !ids.contains(&e.entity_id()) {
+                    ids.push(e.entity_id());
+                }
+                e
+            },
+        )
+        .or_else(|_| {
+            // Compositor sem LayerShell: cai para uma janela xdg normal (PopUp).
+            cx.open_window(overlay_options(WindowKind::PopUp, target), move |_window, cx| {
+                let e = cx.new(|cx| {
+                    OverlayEntity::new(
+                        shared_popup.clone(),
+                        ids_popup.clone(),
+                        target,
+                        is_fallback,
+                        cx,
+                    )
+                });
+                let mut ids = ids_popup.lock().unwrap();
+                if !ids.contains(&e.entity_id()) {
+                    ids.push(e.entity_id());
+                }
+                e
+            })
+        })
+        .map(|handle| {
+            log::info!("overlay: janela criada para display {target:?}");
+            overlays.lock().unwrap().push((handle, target))
+        })
+        .map_err(|err| {
+            log::warn!("não foi possível criar a janela de overlay ({target:?}): {err}");
+            anyhow::anyhow!("{err}")
+        })
     }
 
     /// Observa a pasta de sons e espelha mudanças externas na UI.
@@ -198,6 +322,8 @@ impl MainWindow {
     }
 
     fn on_tick(&mut self, cx: &mut Context<Self>) {
+        // Monitores que aparecem depois da largada ganham overlay aqui.
+        self.ensure_overlays(cx);
         let mut s = self.shared.lock().unwrap();
 
         if let Some(name) = s.play_request.take() {
@@ -218,6 +344,7 @@ impl MainWindow {
                 }
                 s.overlay_active = false;
                 s.overlay_anchor = None;
+                s.anchor_needs_confirm = false;
                 s.pie_hovered = None;
                 s.bump();
             }
@@ -303,16 +430,65 @@ impl MainWindow {
     }
 
     fn resize_overlay(&self, cx: &mut Context<Self>, active: bool) {
-        let size = if active {
-            cx.displays().first().map(|display| display.bounds().size)
+        // Cada overlay cobre o seu display (lookup por display_id, sem
+        // depender de ordem); inativo volta a 1x1.
+        let bounds_by_display: std::collections::HashMap<
+            Option<open_gpui::DisplayId>,
+            open_gpui::Bounds<open_gpui::Pixels>,
+        > = if active {
+            cx.displays()
+                .iter()
+                .map(|d| (Some(d.id()), d.bounds()))
+                .collect()
         } else {
-            None
+            Default::default()
         };
-        if let Some(handle) = self.overlay.lock().unwrap().as_ref() {
+        for (handle, target) in self.overlay.lock().unwrap().iter() {
+            let bounds = bounds_by_display.get(target).copied();
+            let size = bounds.map(|b| b.size).unwrap_or(open_gpui::size(px(1.0), px(1.0)));
+            // Origem real do display (window.bounds() de layer-shell mente:
+            // sempre 1x1@(0,0)).
+            let origin = bounds.map(|b| b.origin);
+            let shared = self.shared.clone();
             let _ = handle.update(cx, |this, window, cx| {
-                window.resize(size.unwrap_or(open_gpui::size(px(1.0), px(1.0))));
+                window.resize(size);
+                if active {
+                    log::info!("overlay janela {target:?}: display {bounds:?}");
+                    // Garante topo + foco de entrada no KDE (layer-shell pode
+                    // ficar atrás sem activate).
+                    window.activate_window();
+                    if window.is_mouse_in_window() {
+                        let mut s = shared.lock().unwrap();
+                        if s.overlay_anchor.is_none() {
+                            let p = window.mouse_position();
+                            let anchor = match origin {
+                                Some(o) => (
+                                    f32::from(p.x) + f32::from(o.x),
+                                    f32::from(p.y) + f32::from(o.y),
+                                ),
+                                None => (f32::from(p.x), f32::from(p.y)),
+                            };
+                            log::info!(
+                                "overlay âncora (pré): ({:.0}, {:.0})",
+                                anchor.0,
+                                anchor.1
+                            );
+                            s.overlay_anchor = Some(anchor);
+                            s.anchor_x = None;
+                            s.anchor_needs_confirm = false;
+                            s.bump();
+                        }
+                    }
+                }
                 this.set_active(active, cx);
             });
+        }
+        if active {
+            log::info!(
+                "overlay ativado: {} janela(s), {} display(s)",
+                self.overlay.lock().unwrap().len(),
+                bounds_by_display.len()
+            );
         }
     }
 
@@ -870,7 +1046,7 @@ async fn maybe_autoplay(
     }
 }
 
-fn overlay_options(kind: WindowKind) -> WindowOptions {
+fn overlay_options(kind: WindowKind, display_id: Option<open_gpui::DisplayId>) -> WindowOptions {
     WindowOptions {
         kind,
         window_bounds: Some(WindowBounds::Windowed(open_gpui::Bounds {
@@ -882,6 +1058,7 @@ fn overlay_options(kind: WindowKind) -> WindowOptions {
         is_movable: false,
         is_resizable: false,
         is_minimizable: false,
+        display_id,
         window_background: WindowBackgroundAppearance::Transparent,
         window_decorations: Some(WindowDecorations::Client),
         app_id: Some("klipp".into()),
@@ -894,7 +1071,11 @@ fn default_layer_shell_options() -> LayerShellOptions {
     LayerShellOptions {
         namespace: "klipp".into(),
         layer: Layer::Overlay,
-        anchor: Anchor::empty(),
+        // Fullscreen: ancora nas 4 bordas para esticar na tela inteira.
+        // Com `Anchor::empty()` a janela ficava flutuante/centrada e o
+        // resize para o tamanho do display não cobria a tela — o overlay
+        // parecia "não aparecer".
+        anchor: Anchor::TOP | Anchor::BOTTOM | Anchor::LEFT | Anchor::RIGHT,
         exclusive_zone: None,
         exclusive_edge: None,
         margin: None,
