@@ -127,13 +127,16 @@ impl OverlayEntity {
             let anchor = if shared.anchor_needs_confirm || shared.overlay_anchor.is_none() {
                 shared.anchor_needs_confirm = false;
                 if let Some(x) = shared.anchor_x.take() {
-                    let calib = (pos.0 - x.0, pos.1 - x.1);
-                    shared.cursor_calib = Some(calib);
-                    log::info!(
-                        "overlay calib: ({:.0}, {:.0})",
-                        calib.0,
-                        calib.1
-                    );
+                    // Só aprende o offset se o cursor ficou parado (perto do
+                    // X): se o usuário andou até aqui, a diferença é
+                    // movimento, não erro sistemático.
+                    let (dx, dy) = (pos.0 - x.0, pos.1 - x.1);
+                    if dx.hypot(dy) < 250.0 {
+                        shared.cursor_calib = Some((dx, dy));
+                        log::info!("overlay calib: ({dx:.0}, {dy:.0})");
+                    } else {
+                        log::info!("overlay sem calibrar (moveu {dx:.0}, {dy:.0})");
+                    }
                 }
                 shared.overlay_anchor = Some(pos);
                 shared.bump();

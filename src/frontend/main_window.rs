@@ -464,9 +464,11 @@ impl MainWindow {
                 let pos = (lx + ox, ly + oy);
                 let mut s = self.shared.lock().unwrap();
                 if let Some(x) = s.anchor_x.take() {
-                    let calib = (pos.0 - x.0, pos.1 - x.1);
-                    s.cursor_calib = Some(calib);
-                    log::info!("overlay calib: ({:.0}, {:.0})", calib.0, calib.1);
+                    let (dx, dy) = (pos.0 - x.0, pos.1 - x.1);
+                    if dx.hypot(dy) < 250.0 {
+                        s.cursor_calib = Some((dx, dy));
+                        log::info!("overlay calib: ({dx:.0}, {dy:.0})");
+                    }
                 }
                 s.anchor_needs_confirm = false;
                 s.overlay_anchor = Some(pos);

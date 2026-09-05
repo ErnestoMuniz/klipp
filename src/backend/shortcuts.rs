@@ -148,6 +148,7 @@ pub async fn run(shared: Arc<std::sync::Mutex<Shared>>, preferred: String) -> an
                     // offset). Sem XWayland, None + fallback (primário).
                     let x = crate::backend::cursor::pointer();
                     log::info!("atalho cursor: {x:?}");
+                    log::info!("atalho opts: {:?}", event.options());
                     set_shared(&shared, |s| {
                         let (ox, oy) = s.cursor_calib.unwrap_or((0.0, 0.0));
                         let anchor = x.map(|p| (p.0 + ox, p.1 + oy));
