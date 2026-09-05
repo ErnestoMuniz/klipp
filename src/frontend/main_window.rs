@@ -324,6 +324,9 @@ impl MainWindow {
     fn on_tick(&mut self, cx: &mut Context<Self>) {
         // Monitores que aparecem depois da largada ganham overlay aqui.
         self.ensure_overlays(cx);
+        // Âncora aproximada? Fixa a exata assim que o cursor estiver sobre
+        // um overlay (sem precisar de movimento).
+        self.confirm_anchor_from_hover(cx);
         let mut s = self.shared.lock().unwrap();
 
         if let Some(name) = s.play_request.take() {
@@ -426,6 +429,51 @@ impl MainWindow {
             cx.notify();
         } else if animated {
             cx.notify();
+        }
+    }
+
+    /// Confirma a âncora via hover: quando o overlay mapeia sob o cursor, o
+    /// compositor manda enter com a posição exata — mesmo parado. Com isso o
+    /// pie já nasce no lugar certo, sem "jiggle". Também aprende o offset
+    /// X→Wayland para as próximas ativações.
+    fn confirm_anchor_from_hover(&self, cx: &mut Context<Self>) {
+        if !self.shared.lock().unwrap().anchor_needs_confirm {
+            return;
+        }
+        let origins: std::collections::HashMap<Option<open_gpui::DisplayId>, (f32, f32)> =
+            cx.displays()
+                .iter()
+                .map(|d| {
+                    let o = d.bounds().origin;
+                    (Some(d.id()), (f32::from(o.x), f32::from(o.y)))
+                })
+                .collect();
+        for (handle, target) in self.overlay.lock().unwrap().iter() {
+            let Some((ox, oy)) = origins.get(target).copied() else {
+                continue;
+            };
+            let hovered = handle.update(cx, |_, window, _| {
+                if window.is_mouse_in_window() {
+                    let p = window.mouse_position();
+                    Some((f32::from(p.x), f32::from(p.y)))
+                } else {
+                    None
+                }
+            });
+            if let Ok(Some((lx, ly))) = hovered {
+                let pos = (lx + ox, ly + oy);
+                let mut s = self.shared.lock().unwrap();
+                if let Some(x) = s.anchor_x.take() {
+                    let calib = (pos.0 - x.0, pos.1 - x.1);
+                    s.cursor_calib = Some(calib);
+                    log::info!("overlay calib: ({:.0}, {:.0})", calib.0, calib.1);
+                }
+                s.anchor_needs_confirm = false;
+                s.overlay_anchor = Some(pos);
+                s.bump();
+                log::info!("overlay âncora (hover): ({:.0}, {:.0})", pos.0, pos.1);
+                break;
+            }
         }
     }
 
