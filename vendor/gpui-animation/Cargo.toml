@@ -1,0 +1,21 @@
+[package]
+name = "gpui-animation"
+version = "0.2.63"
+authors = ["ch1ll321 <earlysun.984190929@gmail.com>"]
+license = "MIT OR Apache-2.0"
+keywords = ["gpui", "animation", "ui", "transition"]
+description = "A lightweight and fluent animation wrapper for GPUI, enabling smooth state-driven transitions with minimal boilerplate (patched for open-gpui)."
+repository = "https://github.com/chi11321/gpui-animation"
+readme = "README.md"
+categories = ["gui", "rendering"]
+edition = "2024"
+
+[lib]
+name = "gpui_animation"
+path = "src/lib.rs"
+
+[dependencies]
+dashmap = "6.1.0"
+open-gpui = "0.2"
+parking_lot = "0.12.5"
+smol = "2.0.2"
