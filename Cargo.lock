@@ -2873,12 +2873,14 @@ dependencies = [
  "notify",
  "open-gpui",
  "open-gpui-platform",
+ "resvg",
  "serde",
  "serde_json",
  "smallvec",
  "swash",
  "symphonia",
  "ureq",
+ "x11rb",
  "zbus",
 ]
 

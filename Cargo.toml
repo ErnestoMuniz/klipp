@@ -25,6 +25,8 @@ gpui-animation = { path = "vendor/gpui-animation" }
 ureq = { version = "2", features = ["json"] }
 cosmic-text = "0.19"
 swash = "0.2"
+resvg = { version = "0.46", default-features = false, features = ["text", "system-fonts"] }
+x11rb = { version = "0.13", default-features = false }
 
 [profile.dev]
 opt-level = 1
