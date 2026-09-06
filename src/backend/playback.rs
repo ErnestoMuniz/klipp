@@ -41,6 +41,31 @@ impl Engine {
         self.stop_previous();
     }
 
+    /// Pausa mantendo o índice: a thread dorme sem escrever no sink.
+    /// Congela o elapsed no offset para a UI não andar pausado.
+    pub fn pause(&self, shared: &Arc<Mutex<Shared>>) {
+        let Ok(mut s) = shared.lock() else { return };
+        if s.playing.is_some() && !s.play_paused {
+            let wall = now_ms().saturating_sub(s.play_start_ms) as f32 / 1000.0;
+            if let Some(d) = s.play_duration_secs.filter(|d| *d > 0.0) {
+                s.play_offset_secs = (s.play_offset_secs + wall).clamp(0.0, d);
+            }
+            s.play_paused = true;
+            s.seek_request = None;
+            s.bump();
+        }
+    }
+
+    /// Retoma de onde pausou (o offset congelado vira a nova origem).
+    pub fn resume(&self, shared: &Arc<Mutex<Shared>>) {
+        let Ok(mut s) = shared.lock() else { return };
+        if s.playing.is_some() && s.play_paused {
+            s.play_start_ms = now_ms();
+            s.play_paused = false;
+            s.bump();
+        }
+    }
+
     /// Join bloqueante, só para o desligamento do app.
     pub fn shutdown(&self) {
         let old = {
@@ -134,13 +159,25 @@ impl Engine {
                         // Ganho lido por chunk para o slider de volume valer no meio do play.
                         // Seek: `seek_request` reposiciona o índice (amostras já
                         // decodificadas em memória, pulo imediato sem re-decode).
+                        // Pausado: dorme sem escrever (seek continua valendo).
                         let mut idx = 0usize;
                         while idx < frames.len() {
                             if stop_task.load(Ordering::SeqCst) {
                                 break;
                             }
-                            let seek_to: Option<f32> =
-                                shared.lock().map(|mut s| s.seek_request.take()).unwrap_or(None);
+                            let (seek_to, paused, vol) = shared
+                                .lock()
+                                .map(|mut s| {
+                                    let seek = s.seek_request.take();
+                                    let paused = s.play_paused;
+                                    let vol = if s.muted {
+                                        0.0
+                                    } else {
+                                        s.volume.clamp(0.0, 1.0)
+                                    };
+                                    (seek, paused, vol)
+                                })
+                                .unwrap_or((None, false, 1.0));
                             if let Some(target) = seek_to {
                                 let clamped = target.clamp(0.0, duration);
                                 idx = ((clamped * rate) as usize).min(frames.len());
@@ -151,18 +188,12 @@ impl Engine {
                                 });
                                 continue;
                             }
+                            if paused {
+                                std::thread::sleep(std::time::Duration::from_millis(20));
+                                continue;
+                            }
                             let end = (idx + 512).min(frames.len());
                             let chunk = &frames[idx..end];
-                            let vol = shared
-                                .lock()
-                                .map(|s| {
-                                    if s.muted {
-                                        0.0
-                                    } else {
-                                        s.volume.clamp(0.0, 1.0)
-                                    }
-                                })
-                                .unwrap_or(1.0);
                             let mut bytes = Vec::with_capacity(chunk.len() * 8);
                             for frame in chunk {
                                 bytes.extend_from_slice(&(frame[0] * vol).to_le_bytes());

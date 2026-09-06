@@ -46,6 +46,7 @@ fn en(key: &str) -> &'static str {
         "player.playing" => "Playing",
         "player.stopped" => "Stopped",
         "player.ready" => "Ready to play",
+        "player.idle" => "No audio playing",
         "pad.play" => "Play",
         "pad.playing" => "Playing",
         "empty.title" => "Your library is empty",
@@ -134,6 +135,7 @@ fn pt(key: &str) -> &'static str {
         "player.playing" => "A tocar",
         "player.stopped" => "Parado",
         "player.ready" => "Pronto a reproduzir",
+        "player.idle" => "Nenhum áudio tocando",
         "pad.play" => "Tocar",
         "pad.playing" => "A tocar",
         "empty.title" => "A sua biblioteca está vazia",
@@ -227,6 +229,7 @@ mod tests {
             "err.mic",
             "browse.downloading",
             "player.ready",
+            "player.idle",
         ] {
             assert_ne!(super::t("en", key), "", "falta em en: {key}");
             assert_ne!(super::t("pt-BR", key), "", "falta em pt-BR: {key}");

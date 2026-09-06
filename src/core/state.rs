@@ -258,13 +258,16 @@ impl Shared {
     }
 
     /// Posição atual do playback (elapsed, duration) em segundos.
-    /// `None` quando parado ou sem duração conhecida.
+    /// `None` quando parado ou sem duração conhecida. Pausado devolve o
+    /// offset congelado (o relógio de parede não anda).
     pub fn playback_pos(&self, now_ms: u128) -> Option<(f32, f32)> {
         let duration = self.play_duration_secs.filter(|d| *d > 0.0)?;
         if self.playing.is_none() {
             return None;
         }
-        let elapsed = if self.seek_request.is_some() {
+        let elapsed = if self.play_paused {
+            self.play_offset_secs
+        } else if self.seek_request.is_some() {
             // Seek pendente: mostra o alvo de imediato (sem esperar a thread).
             self.seek_request.unwrap_or(self.play_offset_secs)
         } else {
@@ -336,5 +339,17 @@ mod tests {
         s.play_start_ms = 1000;
         s.seek_request = Some(8.0);
         assert_eq!(s.playback_pos(1500), Some((8.0, 10.0)));
+    }
+
+    #[test]
+    fn playback_pos_congela_quando_pausado() {
+        let mut s = Shared::new(&Settings::default());
+        s.playing = Some("a".into());
+        s.play_duration_secs = Some(10.0);
+        s.play_offset_secs = 4.0;
+        s.play_start_ms = 1000;
+        s.play_paused = true;
+        // Relógio anda, posição não.
+        assert_eq!(s.playback_pos(9000), Some((4.0, 10.0)));
     }
 }

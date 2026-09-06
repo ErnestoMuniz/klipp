@@ -1,6 +1,6 @@
 use open_gpui::{Context, IntoElement, MouseButton, div, prelude::*, px};
 
-use super::format::{format_clock, now_ms, progress_fraction, rgb_dark};
+use super::format::{format_clock, progress_fraction, rgb_dark};
 use super::icons::icon;
 use super::main_window::MainWindow;
 use super::theme;
@@ -23,6 +23,7 @@ impl MainWindow {
         muted: bool,
         playback: Option<(f32, f32)>,
         peaks: &[f32],
+        paused: bool,
         lang: &str,
         cx: &mut Context<Self>,
     ) -> impl IntoElement {
@@ -34,7 +35,7 @@ impl MainWindow {
             .flex()
             .flex_col()
             .items_center()
-            .child(self.player_bar(playing, playing_label, volume, muted, playback, peaks, lang, cx))
+            .child(self.player_bar(playing, playing_label, volume, muted, playback, peaks, paused, lang, cx))
             .child(
                 div()
                     .absolute()
@@ -88,21 +89,18 @@ impl MainWindow {
         muted: bool,
         playback: Option<(f32, f32)>,
         peaks: &[f32],
+        paused: bool,
         lang: &str,
         cx: &mut Context<Self>,
     ) -> impl IntoElement {
-        let (state_label, track_label) = match playing {
-            Some(_) => (
-                t(lang, "player.playing").to_uppercase(),
-                playing_label.unwrap_or(&t(lang, "player.ready")).to_string(),
-            ),
-            None => (
-                t(lang, "player.stopped").to_uppercase(),
-                t(lang, "player.ready"),
-            ),
-        };
-        let toggle_icon = if playing.is_some() {
-            "lucide-square"
+        // Sem estado nem placeholders antigos: tocando mostra o nome do
+        // áudio, parado mostra um placeholder neutro.
+        let track_label = playing_label
+            .map(str::to_string)
+            .unwrap_or_else(|| t(lang, "player.idle"));
+        // Tocando: pause. Pausado ou parado: play.
+        let toggle_icon = if playing.is_some() && !paused {
+            "lucide-pause"
         } else {
             "lucide-play"
         };
@@ -129,7 +127,6 @@ impl MainWindow {
             .border_1()
             .border_color(theme::border())
             .rounded(px(14.0))
-            .child(self.progress_section(playback, peaks, cx))
             .child(
                 div()
                     .flex()
@@ -152,20 +149,17 @@ impl MainWindow {
                                     .text_color(theme::muted())
                                     .child(icon(toggle_icon, 20.0, theme::muted())),
                             )
-                            .child(eq_bars(playing.is_some()))
                             .child(
                                 div()
-                                    .flex()
-                                    .flex_col()
-                                    .gap_1()
                                     .w(px(180.0))
-                                    .child(
-                                        div()
-                                            .text_xs()
-                                            .text_color(theme::muted())
-                                            .child(state_label),
-                                    )
-                                    .child(div().text_sm().truncate().child(track_label)),
+                                    .text_sm()
+                                    .truncate()
+                                    .text_color(if playing.is_some() {
+                                        theme::text()
+                                    } else {
+                                        theme::muted()
+                                    })
+                                    .child(track_label),
                             ),
                     )
                     .child(
@@ -244,6 +238,7 @@ impl MainWindow {
                             ),
                     ),
             )
+            .child(self.progress_section(playback, peaks, cx))
     }
 
     /// Forma de onda clicável: 128 barras com a altura do pico de cada
@@ -336,29 +331,4 @@ impl MainWindow {
                     .child(format_clock(duration)),
             )
     }
-}
-
-/// Equalizador do player: 4 barrinhas azuis oscilando enquanto toca,
-/// pequenas e cinzas quando parado.
-/// (Tempo em f64: o timestamp em ms não cabe num f32 sem quantizar.)
-fn eq_bars(playing: bool) -> impl IntoElement {
-    let t = now_ms() as f64 / 1000.0;
-    div().flex().flex_row().items_center().gap_1().children(
-        (0..4)
-            .map(|i| {
-                let h = if playing {
-                    let phase = t * 5.2 + i as f64 * 1.5;
-                    (5.0 + 9.0 * (0.5 + 0.5 * phase.sin())) as f32
-                } else {
-                    4.0
-                };
-                let c = if playing {
-                    theme::accent()
-                } else {
-                    theme::border()
-                };
-                div().w(px(3.0)).h(px(h)).bg(c).rounded(px(999.0))
-            })
-            .collect::<Vec<_>>(),
-    )
 }

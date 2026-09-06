@@ -576,10 +576,6 @@ impl MainWindow {
         cx.notify();
     }
 
-    pub(crate) fn stop(&self) {
-        self.engine.stop();
-    }
-
     pub(crate) fn rescan(&self) {
         let mut s = self.shared.lock().unwrap();
         s.sounds = backend::list_sounds();
@@ -941,15 +937,22 @@ impl MainWindow {
     }
 
     pub(crate) fn toggle_play(&self, cx: &mut Context<Self>) {
-        let playing = self.shared.lock().unwrap().playing.clone();
-        if playing.is_some() {
-            self.stop();
-            return;
-        }
-        let first = self.shared.lock().unwrap().sounds.first().cloned();
-        if let Some(sound) = first {
-            let shared = self.shared.clone();
-            self.engine.play(sound.path, sound.name, shared);
+        let (playing, paused) = {
+            let s = self.shared.lock().unwrap();
+            (s.playing.is_some(), s.play_paused)
+        };
+        match (playing, paused) {
+            // Tocando: pausa (mantém o índice). Pausado: retoma.
+            (true, false) => self.engine.pause(&self.shared),
+            (true, true) => self.engine.resume(&self.shared),
+            // Parado: toca o primeiro som da lista.
+            (false, _) => {
+                let first = self.shared.lock().unwrap().sounds.first().cloned();
+                if let Some(sound) = first {
+                    let shared = self.shared.clone();
+                    self.engine.play(sound.path, sound.name, shared);
+                }
+            }
         }
         cx.notify();
     }
@@ -1251,6 +1254,7 @@ impl Render for MainWindow {
             editor_open,
             playback,
             play_peaks,
+            play_paused,
         ) = {
             let shared = self.shared.lock().unwrap();
             let now = super::format::now_ms();
@@ -1279,6 +1283,7 @@ impl Render for MainWindow {
                 shared.editor_open,
                 playback,
                 shared.play_peaks.clone(),
+                shared.play_paused,
             )
         };
         // Tema global (todas as cores de `theme::` passam a ler a paleta ativa).
@@ -1388,6 +1393,7 @@ impl Render for MainWindow {
                 muted,
                 playback,
                 &play_peaks,
+                play_paused,
                 &lang,
                 cx,
             ))
