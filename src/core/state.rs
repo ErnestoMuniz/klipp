@@ -144,11 +144,17 @@ pub struct Shared {
     /// seek e instante de início. `elapsed = offset + (now - start)/1000`.
     /// `seek_request` é consumido pela thread de playback (pulo imediato).
     /// `play_peaks` é a forma de onda (ver `WAVEFORM_BARS`).
+    /// `play_seq` é a geração publicada no `Shared` (espelha
+    /// `EngineInner.seq`): threads obsoletas conferem antes de tocar a UI.
+    /// `play_paused` congela o progresso: a thread dorme sem escrever e
+    /// `playback_pos` devolve o offset (sem parede de relógio).
+    pub play_seq: u64,
     pub play_duration_secs: Option<f32>,
     pub play_offset_secs: f32,
     pub play_start_ms: u128,
     pub seek_request: Option<f32>,
     pub play_peaks: Vec<f32>,
+    pub play_paused: bool,
     pub version: u64,
 }
 
@@ -226,11 +232,13 @@ impl Shared {
             browse_previewing: None,
             browse_preview_loading: false,
             browse_preview_started_ms: 0,
+            play_seq: 0,
             play_duration_secs: None,
             play_offset_secs: 0.0,
             play_start_ms: 0,
             seek_request: None,
             play_peaks: vec![],
+            play_paused: false,
             version: 1,
         }
     }

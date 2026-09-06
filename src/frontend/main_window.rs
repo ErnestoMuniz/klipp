@@ -335,15 +335,20 @@ impl MainWindow {
         self.ensure_overlays(cx);
         // Âncora exata (thread) e hover: sincroniza as janelas de overlay.
         self.sync_overlay_windows(cx);
+        // Pedido de play fora do guard: `Engine::play` publica a época no
+        // `Shared` de forma síncrona (travar aqui = deadlock na UI thread).
+        let play_now: Option<Sound> = {
+            let mut s = self.shared.lock().unwrap();
+            s.play_request
+                .take()
+                .and_then(|name| s.sounds.iter().find(|sound| sound.name == name).cloned())
+        };
+        if let Some(sound) = play_now {
+            self.engine
+                .play(sound.path.clone(), sound.name.clone(), self.shared.clone());
+        }
         let mut s = self.shared.lock().unwrap();
 
-        if let Some(name) = s.play_request.take() {
-            if let Some(sound) = s.sounds.iter().find(|sound| sound.name == name) {
-                let shared = self.shared.clone();
-                self.engine
-                    .play(sound.path.clone(), sound.name.clone(), shared);
-            }
-        }
         if s.stop_request {
             s.stop_request = false;
             self.engine.stop();
