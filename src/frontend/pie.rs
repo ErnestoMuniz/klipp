@@ -1,8 +1,8 @@
 /// Geometria + geração do SVG do pie selector (overlay).
 /// Arquivo puro (sem GPUI): fácil de testar e de iterar no frontend.
 
-pub const PIE: f32 = 460.0;
-const CENTER: f32 = PIE / 2.0;
+pub const PIE: f32 = 520.0;
+pub const CENTER: f32 = PIE / 2.0;
 pub const OUTER: f32 = 218.0;
 pub const INNER: f32 = 69.0;
 pub const PAGE: usize = 8;
@@ -34,6 +34,13 @@ pub fn short_label(label: &str) -> String {
     }
 }
 
+/// Dentro do botão central (raio interno): parar o áudio.
+pub fn in_center(pos_x: f32, pos_y: f32, anchor: (f32, f32)) -> bool {
+    let dx = pos_x - anchor.0;
+    let dy = pos_y - anchor.1;
+    (dx * dx + dy * dy).sqrt() <= INNER
+}
+
 /// Converte posição do mouse em índice da fatia (ângulo a partir do topo, horário).
 pub fn hit_test(
     pos_x: f32,
@@ -61,51 +68,117 @@ pub fn hit_test(
     (Some(idx), true)
 }
 
-pub fn gen_pie_svg(names: &[String], hovered: Option<usize>) -> String {
-    let n = names.len().min(PAGE);
+/// Cores do pie por tema (neutras do projeto, ver `theme.rs`: dark = grafite,
+/// light = papel/creme; hover = accent do app).
+pub struct PieColors {
+    pub backdrop: &'static str,
+    pub backdrop_op: &'static str,
+    pub backdrop_stroke: &'static str,
+    pub wedge: &'static str,
+    pub wedge_hover: &'static str,
+    pub wedge_stroke: &'static str,
+    pub center: &'static str,
+    pub center_stroke: &'static str,
+}
+
+pub fn pie_colors(light: bool) -> PieColors {
+    if light {
+        PieColors {
+            backdrop: "#ffffff",
+            backdrop_op: "0.95",
+            backdrop_stroke: "#dbd8d1",
+            wedge: "#f6f4ee",
+            // = theme::accent() light
+            wedge_hover: "#2a80e2",
+            wedge_stroke: "#c5c2bb",
+            center: "#f6f4ee",
+            center_stroke: "#c5c2bb",
+        }
+    } else {
+        PieColors {
+            // = theme::titlebar/panel/card/border dark
+            backdrop: "#101010",
+            backdrop_op: "0.92",
+            backdrop_stroke: "#2e2e2e",
+            wedge: "#252525",
+            // = theme::accent() dark
+            wedge_hover: "#42a1ff",
+            wedge_stroke: "#3f3f3f",
+            center: "#1e1e1e",
+            center_stroke: "#3f3f3f",
+        }
+    }
+}
+
+/// Centro geométrico da fatia `i` (coords da caixa 460x460): posiciona os
+/// rótulos GPUI (emoji + nome) sobre a fatia.
+pub fn slice_mid(i: usize, n: usize) -> (f32, f32) {
+    let n = n.min(PAGE).max(1) as f32;
+    let slice = 360.0 / n;
+    let mid = -90.0 + i as f32 * slice + slice / 2.0;
+    polar((OUTER + INNER) / 2.0, mid)
+}
+
+/// Pie completo (fundo + fatias + centro, só formas — textos são divs GPUI).
+pub fn gen_pie_svg(count: usize, light: bool) -> String {
+    gen_pie_inner(count, None, light, false)
+}
+
+/// Só a fatia `idx` em destaque, resto transparente (camada de hover).
+pub fn gen_pie_highlight_svg(count: usize, idx: usize, light: bool) -> String {
+    gen_pie_inner(count, Some(idx), light, true)
+}
+
+fn gen_pie_inner(count: usize, highlight: Option<usize>, light: bool, solo: bool) -> String {
+    let c = pie_colors(light);
+    let n = count.min(PAGE);
+    // Canvas 520 (pie 460 + 30px de margem): a sombra borrada espalha ~36px.
     let mut svg = String::from(
-        r##"<svg xmlns="http://www.w3.org/2000/svg" width="460" height="460" viewBox="0 0 460 460">
-  <circle cx="230" cy="230" r="218" fill="#020617" fill-opacity="0.88" stroke="#e2e8f0" stroke-opacity="0.35" stroke-width="1.5" />"##,
+        r##"<svg xmlns="http://www.w3.org/2000/svg" width="520" height="520" viewBox="0 0 520 520">
+  <defs>
+    <filter id="pie-shadow">
+      <feDropShadow dx="6" dy="10" stdDeviation="12" flood-color="#000000" flood-opacity="0.45" />
+    </filter>
+  </defs>"##,
     );
+    if !solo {
+        svg.push_str(&format!(
+            r##"
+  <circle cx="260" cy="260" r="218" fill="{}" fill-opacity="{}" stroke="{}" stroke-opacity="0.6" stroke-width="1.5" filter="url(#pie-shadow)" />"##,
+            c.backdrop, c.backdrop_op, c.backdrop_stroke
+        ));
+    }
 
     if n > 0 {
         let slice = 360.0 / n as f32;
-        for (i, name) in names.iter().take(n).enumerate() {
+        for i in 0..n {
+            let is_hovered = highlight == Some(i);
+            if solo && !is_hovered {
+                continue;
+            }
+            let fill = if is_hovered { c.wedge_hover } else { c.wedge };
             let d0 = -90.0 + i as f32 * slice;
             let d1 = d0 + slice;
-            let mid = (d0 + d1) / 2.0;
-            let (fill, fill_op) = if hovered == Some(i) {
-                ("#0ea5e9", "0.97")
-            } else {
-                ("#1e293b", "0.97")
-            };
-            let (lx, ly) = polar((OUTER + INNER) / 2.0, mid);
             svg.push_str(&format!(
-                r##"  <path d="{}" fill="{fill}" fill-opacity="{fill_op}" stroke="#f1f5f9" stroke-opacity="0.65" stroke-width="1.5"/>
-  <text x="{lx:.1}" y="{ly:.1}" text-anchor="middle" font-size="24" font-family="'DejaVu Sans','Noto Sans',sans-serif" fill="#ffffff">{note}</text>
-  <text x="{lx:.1}" y="{ly:.1}" dy="19" text-anchor="middle" font-size="14" font-weight="bold" font-family="'DejaVu Sans','Noto Sans',sans-serif" fill="#ffffff" stroke="#000000" stroke-opacity="0.85" stroke-width="3" paint-order="stroke">{label}</text>
-"##,
+                r##"
+  <path d="{}" fill="{fill}" fill-opacity="0.97" stroke="{}" stroke-opacity="0.7" stroke-width="1.5"/>"##,
                 wedge(d0, d1),
-                note = "♪",
-                label = escape_xml(&short_label(name))
+                c.wedge_stroke,
             ));
         }
     }
 
-    svg.push_str(&format!(
-        r##"  <circle cx="230" cy="230" r="69" fill="#0f172a" stroke="#94a3b8" stroke-opacity="0.9" stroke-width="1.5"/>
-  <text x="230" y="227" text-anchor="middle" font-size="20" font-weight="bold" font-family="'DejaVu Sans','Noto Sans',sans-serif" fill="#f8fafc">Klipp</text>
-  <text x="230" y="247" text-anchor="middle" font-size="13" font-weight="bold" font-family="'DejaVu Sans','Noto Sans',sans-serif" fill="#ffffff">{n} sons</text>
-</svg>"##
-    ));
+    if !solo {
+        svg.push_str(&format!(
+            r##"
+  <circle cx="260" cy="260" r="69" fill="{}" stroke="{}" stroke-opacity="0.9" stroke-width="1.5"/>
+</svg>"##,
+            c.center, c.center_stroke
+        ));
+    } else {
+        svg.push_str("</svg>");
+    }
     svg
-}
-
-fn escape_xml(text: &str) -> String {
-    text.replace('&', "&amp;")
-        .replace('<', "&lt;")
-        .replace('>', "&gt;")
-        .replace('"', "&quot;")
 }
 
 /// Rasteriza o pie em RGBA (460x460).
@@ -113,13 +186,33 @@ fn escape_xml(text: &str) -> String {
 /// O elemento `svg()` do GPUI renderiza como máscara de alpha tingida de
 /// uma cor só — cores e textos do SVG são descartados (pie todo branco).
 /// Rasterizando com resvg e exibindo via `img()`, as cores saem fiéis.
-pub fn render_pie_image(names: &[String], hovered: Option<usize>) -> Option<image::RgbaImage> {
-    let svg_text = gen_pie_svg(names, hovered);
+/// O SVG tem só formas (textos são divs GPUI por cima).
+pub fn render_pie_image(count: usize, light: bool) -> Option<image::RgbaImage> {
+    render_svg_image(&gen_pie_svg(count, light))
+}
+
+/// Rasteriza só a fatia em destaque (fundo transparente).
+pub fn render_pie_highlight_image(
+    count: usize,
+    idx: usize,
+    light: bool,
+) -> Option<image::RgbaImage> {
+    render_svg_image(&gen_pie_highlight_svg(count, idx, light))
+}
+
+fn render_svg_image(svg_text: &str) -> Option<image::RgbaImage> {
+    use std::sync::OnceLock;
+    // Carregado uma vez: varrer as fontes do sistema a cada hover dava o
+    // delay (~200ms) na troca de destaque.
+    static FONTDB: OnceLock<std::sync::Arc<resvg::usvg::fontdb::Database>> = OnceLock::new();
+    let db = FONTDB.get_or_init(|| {
+        let mut db = resvg::usvg::fontdb::Database::new();
+        db.load_system_fonts();
+        std::sync::Arc::new(db)
+    });
     let mut opts = resvg::usvg::Options::default();
     // Sem isso o fontdb fica vazio e nenhum glifo renderiza (texto some).
-    let mut db = resvg::usvg::fontdb::Database::new();
-    db.load_system_fonts();
-    opts.fontdb = std::sync::Arc::new(db);
+    opts.fontdb = db.clone();
     let tree = resvg::usvg::Tree::from_str(&svg_text, &opts).ok()?;
     let w = PIE as u32;
     let h = PIE as u32;
@@ -129,45 +222,88 @@ pub fn render_pie_image(names: &[String], hovered: Option<usize>) -> Option<imag
         resvg::tiny_skia::Transform::identity(),
         &mut pixmap.as_mut(),
     );
-    image::RgbaImage::from_raw(w, h, pixmap.take())
+    let mut img = image::RgbaImage::from_raw(w, h, pixmap.take())?;
+    // RenderImage é BGRA (ver o raster do emoji): sem a troca, azul vira
+    // laranja (R↔B). Cinzas não mostravam o bug.
+    for pixel in img.pixels_mut() {
+        let r = pixel[0];
+        pixel[0] = pixel[2];
+        pixel[2] = r;
+    }
+    Some(img)
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{gen_pie_svg, render_pie_image};
+    use super::{
+        gen_pie_highlight_svg, gen_pie_svg, in_center, pie_colors, render_pie_highlight_image,
+        render_pie_image, slice_mid, INNER,
+    };
 
     #[test]
-    fn pie_tem_contraste_fatias_escuras_e_texto_branco() {
-        let names = vec!["boom".to_string(), "airhorn".to_string()];
-        let svg = gen_pie_svg(&names, Some(0));
-        // Fatias opacas escuras (legível sobre qualquer wallpaper).
-        assert!(svg.contains("#1e293b"), "fatia normal escura");
-        assert!(svg.contains("#0ea5e9"), "fatia hover");
-        // Textos brancos com contorno para leitura.
-        assert!(svg.contains("paint-order=\"stroke\""), "label com contorno");
-        assert!(svg.contains("fill=\"#ffffff\""), "texto branco");
-        // Sem dim translúcido fraco que lavava o pie.
-        assert!(!svg.contains("0.55"), "sem alpha lavado");
-        assert!(!svg.contains("0.75"), "sem alpha lavado");
+    fn pie_dark_tem_contraste() {
+        let svg = gen_pie_svg(2, false);
+        assert!(svg.contains("#252525"), "fatia neutra escura");
+        assert!(!svg.contains("#42a1ff"), "base não destaca nada");
+        assert!(!svg.contains("<text"), "sem texto no SVG");
+        let hl = gen_pie_highlight_svg(2, 0, false);
+        assert!(hl.contains("#42a1ff"), "destaque accent");
+        assert!(!hl.contains("r=\"218\""), "destaque sem fundo");
+        let _ = pie_colors(true);
+        let (mx, my) = slice_mid(0, 2);
+        assert!((mx - 230.0).abs() < 230.0 && (my - 230.0).abs() < 230.0);
+    }
+
+    #[test]
+    fn pie_light_tem_contraste() {
+        let svg = gen_pie_svg(1, true);
+        assert!(svg.contains("#f6f4ee"), "fatia clara");
+        let hl = gen_pie_highlight_svg(1, 0, true);
+        assert!(hl.contains("#2a80e2"), "destaque accent");
+    }
+
+    #[test]
+    fn geometria_meio_e_centro() {
+        // Fatia 0 de 2: metade direita, meio em (403.5, 260).
+        let (mx, my) = slice_mid(0, 2);
+        assert!((mx - 403.5).abs() < 1.0 && (my - 260.0).abs() < 1.0);
+        assert!(in_center(260.0, 260.0, (260.0, 260.0)));
+        assert!(in_center(260.0 + INNER, 260.0, (260.0, 260.0)));
+        assert!(!in_center(260.0 + INNER + 1.0, 260.0, (260.0, 260.0)));
+        assert!(!in_center(403.0, 260.0, (260.0, 260.0)));
     }
 
     #[test]
     fn raster_tem_tamanho_e_conteudo() {
-        let names = vec!["boom".to_string(), "airhorn".to_string()];
-        let img = render_pie_image(&names, Some(0)).expect("rasteriza");
-        assert_eq!(img.dimensions(), (460, 460));
-        // Centro do pie (círculo #0f172a opaco): pixel escuro e opaco.
-        let center = img.get_pixel(230, 230);
+        let img = render_pie_image(2, false).expect("rasteriza");
+        assert_eq!(img.dimensions(), (520, 520));
+        // Centro do pie (círculo #1e1e1e opaco): pixel escuro e opaco.
+        let center = img.get_pixel(260, 260);
         assert_eq!(center[3], 255, "centro opaco");
-        assert!(center[0] < 40 && center[1] < 40 && center[2] < 60, "centro escuro: {center:?}");
-        // Canto fora do círculo: transparente (fundo da surface aparece).
+        assert!(center[0] < 60 && center[1] < 60 && center[2] < 60, "centro escuro: {center:?}");
+        // Canto fora de tudo: transparente (fundo da surface aparece).
         assert_eq!(img.get_pixel(5, 5)[3], 0, "canto transparente");
-        // Texto renderiza (fontes do sistema carregadas): há pixels quase
-        // brancos dos rótulos. Sem fonte, o pie sai mudo.
-        let bright = img
-            .pixels()
-            .filter(|p| p[3] > 128 && p[0] > 200 && p[1] > 200 && p[2] > 200)
-            .count();
-        assert!(bright > 100, "texto visível no raster (pixels claros: {bright})");
+        // Sombra borrada além da borda do pie (borda em x=478): tem alpha.
+        assert!(img.get_pixel(495, 260)[3] > 0, "sombra?"
+        );
+        // Destaque: só a fatia, fundo transparente.
+        let hl = render_pie_highlight_image(2, 0, false).expect("rasteriza hl");
+        assert_eq!(hl.dimensions(), (520, 520));
+        assert_eq!(hl.get_pixel(5, 5)[3], 0, "destaque sem fundo");
+        assert!(hl.pixels().any(|p| p[3] > 128), "destaque tem conteúdo");
+        // Cor do destaque fiel: fatia 0 de 2 cobre a metade direita —
+        // (403, 260) é o centro dela. Hover #42a1ff = azul, não laranja:
+        // RenderImage é BGRA (índice 0 = canal azul!). Sem a troca R↔B
+        // na rasterização o azul virava laranja.
+        let mid = hl.get_pixel(403, 260);
+        assert!(mid[3] > 128, "meio da fatia opaco: {mid:?}");
+        assert!(
+            (mid[0] as i16 - mid[2] as i16) > 100,
+            "destaque azul (B≫R): {mid:?}"
+        );
+        // Tema claro rasteriza também.
+        let light = render_pie_image(2, true).expect("rasteriza claro");
+        assert_eq!(light.dimensions(), (520, 520));
+        assert_eq!(light.get_pixel(5, 5)[3], 0, "claro sem fundo nas bordas");
     }
 }

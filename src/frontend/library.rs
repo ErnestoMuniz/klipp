@@ -162,7 +162,8 @@ pub(crate) enum CardAction {
 
 /// Emoji do pad como imagem rasterizada (swash); "♪" padrão vai direto
 /// como texto do sistema, e emoji ainda em raster mostra caixa vazia.
-fn pad_emoji(
+/// Reusado no pie do overlay.
+pub(crate) fn pad_emoji(
     emoji: &str,
     size: open_gpui::Pixels,
     shared: &std::sync::Arc<std::sync::Mutex<crate::core::state::Shared>>,

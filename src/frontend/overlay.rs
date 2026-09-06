@@ -1,12 +1,14 @@
 use std::sync::{Arc, Mutex};
+use std::time::Duration;
 
 use open_gpui::{
-    div, img, px, transparent_black, Bounds, Context, DisplayId, EntityId, MouseButton,
-    MouseDownEvent, MouseMoveEvent, Pixels, Render, RenderImage, Styled, Window,
-    prelude::*,
+    div, img, px, transparent_black, Animation, AnimationExt, Bounds, Context, DisplayId,
+    EntityId, MouseButton, MouseDownEvent, MouseMoveEvent, Pixels, Render, RenderImage,
+    Styled, Window, ease_out_quint, prelude::*,
 };
 
 use super::pie;
+use super::theme;
 use crate::core::state::Shared;
 
 /// Janela overlay (pie selector). Lê/escreve apenas via [`Shared`].
@@ -22,8 +24,8 @@ use crate::core::state::Shared;
 /// nunca de `window.bounds()`.
 pub struct OverlayEntity {
     shared: Arc<Mutex<Shared>>,
-    /// Render do pie rasterizado (cores fiéis) por versão do estado.
-    pie_cache: Option<(u64, Arc<RenderImage>)>,
+    /// Base + destaque rasterizados por (versão, tema).
+    pie_cache: Option<PieCache>,
     /// Output que esta janela cobre (None = transiente da largada).
     display: Option<DisplayId>,
     /// Entidades overlay de todas as janelas: mudar o estado numa precisa
@@ -33,6 +35,16 @@ pub struct OverlayEntity {
     /// Renderiza o pie de fallback (sem âncora) nesta janela: só a do
     /// display primário, para não duplicar o pie em todos os monitores.
     fallback: bool,
+}
+
+/// Base do pie + destaque do hover. A base só muda com sons/tema (não com
+/// hover), então o hover regenera só a fatia — sem o hitch do re-raster
+/// completo.
+struct PieCache {
+    light: bool,
+    names: Vec<String>,
+    base: Arc<RenderImage>,
+    highlight: Option<(usize, Arc<RenderImage>)>,
 }
 
 /// Origem global do display desta janela (`(0,0)` se desconhecido).
@@ -99,8 +111,9 @@ impl OverlayEntity {
         if !active {
             shared.overlay_anchor = None;
             shared.anchor_needs_confirm = false;
-            shared.anchor_x = None;
+            shared.overlay_fading = false;
             shared.pie_hovered = None;
+            shared.center_hovered = false;
         }
         shared.overlay_active = active;
         drop(shared);
@@ -118,26 +131,13 @@ impl OverlayEntity {
         );
         let (anchor, count, active) = {
             let mut shared = self.shared.lock().unwrap();
-            if !shared.overlay_active {
+            if !shared.overlay_active || shared.overlay_fading {
                 return;
             }
-            // Âncora do XWayland é aproximada: o primeiro evento real do
-            // Wayland corrige para a posição exata do cursor e aprende o
-            // offset X→Wayland (próximas ativações já abrem no lugar).
+            // Sem âncora exata (fallback): o primeiro evento real fixa a
+            // posição do cursor.
             let anchor = if shared.anchor_needs_confirm || shared.overlay_anchor.is_none() {
                 shared.anchor_needs_confirm = false;
-                if let Some(x) = shared.anchor_x.take() {
-                    // Só aprende o offset se o cursor ficou parado (perto do
-                    // X): se o usuário andou até aqui, a diferença é
-                    // movimento, não erro sistemático.
-                    let (dx, dy) = (pos.0 - x.0, pos.1 - x.1);
-                    if dx.hypot(dy) < 250.0 {
-                        shared.cursor_calib = Some((dx, dy));
-                        log::info!("overlay calib: ({dx:.0}, {dy:.0})");
-                    } else {
-                        log::info!("overlay sem calibrar (moveu {dx:.0}, {dy:.0})");
-                    }
-                }
                 shared.overlay_anchor = Some(pos);
                 shared.bump();
                 log::info!("overlay âncora: ({:.0}, {:.0})", pos.0, pos.1);
@@ -145,15 +145,23 @@ impl OverlayEntity {
             } else {
                 shared.overlay_anchor.unwrap_or(pos)
             };
-            (anchor, shared.sounds.len(), true)
+            (anchor, shared.favorite_sounds().len(), true)
         };
         let _ = active;
 
-        let hovered = pie::hit_test(pos.0, pos.1, anchor, count).0;
+        // Centro só vale como opção com áudio tocando.
+        let playing = self.shared.lock().unwrap().playing.is_some();
+        let center = playing && pie::in_center(pos.0, pos.1, anchor);
+        let hovered = if center {
+            None
+        } else {
+            pie::hit_test(pos.0, pos.1, anchor, count).0
+        };
 
         let mut shared = self.shared.lock().unwrap();
-        if shared.pie_hovered != hovered {
+        if shared.pie_hovered != hovered || shared.center_hovered != center {
             shared.pie_hovered = hovered;
+            shared.center_hovered = center;
             shared.bump();
         }
         self.notify_siblings(cx);
@@ -165,7 +173,7 @@ impl OverlayEntity {
             return;
         }
         let mut shared = self.shared.lock().unwrap();
-        if !shared.overlay_active {
+        if !shared.overlay_active || shared.overlay_fading {
             return;
         }
         let origin = origin_of(cx, self.display);
@@ -183,56 +191,108 @@ impl OverlayEntity {
                 )
             })
         });
-        let count = shared.sounds.len();
-        let (hovered, inside) = anchor
-            .map(|a| pie::hit_test(pos.0, pos.1, a, count))
-            .unwrap_or((None, false));
+        let count = shared.favorite_sounds().len();
+        let playing = shared.playing.is_some();
+        let (hovered, inside, center) = anchor
+            .map(|a| {
+                let (h, inside) = pie::hit_test(pos.0, pos.1, a, count);
+                (h, inside, !inside && playing && pie::in_center(pos.0, pos.1, a))
+            })
+            .unwrap_or((None, false, false));
 
         if inside {
             if let Some(idx) = hovered {
-                if let Some(sound) = shared.sounds.get(idx) {
+                if let Some(sound) = shared.favorite_sounds().get(idx) {
                     shared.play_request = Some(sound.name.clone());
                 }
             }
+        } else if center {
+            shared.stop_request = true;
         }
-        shared.overlay_active = false;
-        shared.overlay_anchor = None;
-        shared.anchor_needs_confirm = false;
-        shared.anchor_x = None;
-        shared.pie_hovered = None;
+        // Fecha com fade-out rápido (~110ms): mantém montado, o tick
+        // desmonta (ver `on_tick`).
+        shared.overlay_fading = true;
+        shared.overlay_fade_start = super::format::now_ms();
         shared.bump();
         drop(shared);
         self.notify_siblings(cx);
         cx.notify();
     }
 
-    fn pie_image(&mut self, version: u64) -> Option<Arc<RenderImage>> {
-        if let Some((v, image)) = &self.pie_cache {
-            if *v == version {
-                return Some(image.clone());
+    /// Base (por sons+tema) + destaque (por hover). Troca de hover
+    /// regenera só a fatia — o re-raster completo dava o delay.
+    fn pie_images(
+        &mut self,
+        light: bool,
+        hovered: Option<usize>,
+        names: &[String],
+    ) -> Option<(Arc<RenderImage>, Option<(usize, Arc<RenderImage>)>)> {
+        let count = names.len();
+        // Hit de cache (base estável + mesmo destaque): sem re-raster.
+        let cached = match &self.pie_cache {
+            Some(cache) if cache.light == light && cache.names == names => {
+                match (hovered, &cache.highlight) {
+                    (Some(i), Some((j, img))) if i == *j => {
+                        Some((cache.base.clone(), Some((i, img.clone()))))
+                    }
+                    (None, _) => Some((cache.base.clone(), None)),
+                    _ => None,
+                }
             }
-        }
-        let (hovered, names, active) = {
-            let shared = self.shared.lock().unwrap();
-            (
-                shared.pie_hovered,
-                shared
-                    .sounds
-                    .iter()
-                    .take(pie::PAGE)
-                    .map(super::format::sound_label)
-                    .collect::<Vec<_>>(),
-                shared.overlay_active,
-            )
+            _ => None,
         };
-        if !active {
+        if let Some(hit) = cached {
+            return Some(hit);
+        }
+        // Troca de hover com base pronta: regenera só a fatia.
+        if let Some(base) = self
+            .pie_cache
+            .as_ref()
+            .filter(|c| c.light == light && c.names == names)
+            .map(|c| c.base.clone())
+        {
+            let highlight = hovered.and_then(|i| {
+                pie::render_pie_highlight_image(count, i, light).map(|rgba| {
+                    (
+                        i,
+                        Arc::new(RenderImage::new(smallvec::smallvec![
+                            image::Frame::new(rgba)
+                        ])),
+                    )
+                })
+            });
+            self.pie_cache = Some(PieCache {
+                light,
+                names: names.to_vec(),
+                base: base.clone(),
+                highlight: highlight.clone(),
+            });
+            return Some((base, highlight));
+        }
+        if !self.shared.lock().unwrap().overlay_active {
             return None;
         }
-        let rgba = pie::render_pie_image(&names, hovered)?;
-        let frame = image::Frame::new(rgba);
-        let rendered = Arc::new(RenderImage::new(smallvec::smallvec![frame]));
-        self.pie_cache = Some((version, rendered.clone()));
-        Some(rendered)
+        let base = Arc::new(RenderImage::new(smallvec::smallvec![image::Frame::new(
+            pie::render_pie_image(count, light)?,
+        )]));
+        let highlight = match hovered {
+            Some(i) => pie::render_pie_highlight_image(count, i, light).map(|rgba| {
+                (
+                    i,
+                    Arc::new(RenderImage::new(smallvec::smallvec![image::Frame::new(
+                        rgba,
+                    )])),
+                )
+            }),
+            None => None,
+        };
+        self.pie_cache = Some(PieCache {
+            light,
+            names: names.to_vec(),
+            base: base.clone(),
+            highlight: highlight.clone(),
+        });
+        Some((base, highlight))
     }
 }
 
@@ -242,7 +302,28 @@ impl Render for OverlayEntity {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) -> impl IntoElement {
-        let version = self.shared.lock().unwrap().version;
+        let (light, hovered, center_hovered, seq, fading, playing, slices, names, total) = {
+            let shared = self.shared.lock().unwrap();
+            let fav = shared.favorite_sounds();
+            let slices: Vec<(String, String)> = fav
+                .iter()
+                .take(pie::PAGE)
+                .map(|s| (super::format::sound_label(s), s.emoji.clone()))
+                .collect();
+            let names: Vec<String> = slices.iter().map(|(l, _)| l.clone()).collect();
+            let total = fav.len();
+            (
+                theme::is_light(),
+                shared.pie_hovered,
+                shared.center_hovered,
+                shared.overlay_seq,
+                shared.overlay_fading,
+                shared.playing.is_some(),
+                slices,
+                names,
+                total,
+            )
+        };
 
         let root = div()
             .id("overlay-root")
@@ -251,7 +332,7 @@ impl Render for OverlayEntity {
             .on_mouse_move(cx.listener(Self::on_pointer_move))
             .on_mouse_down(MouseButton::Left, cx.listener(Self::on_pointer_down));
 
-        let Some(image) = self.pie_image(version) else {
+        let Some((base, highlight)) = self.pie_images(light, hovered, &names) else {
             return root;
         };
 
@@ -298,14 +379,148 @@ impl Render for OverlayEntity {
             }
         };
 
-        root.child(
+        let mut pie_box = div()
+            .absolute()
+            .left(px(local.0 - pie::PIE / 2.0))
+            .top(px(local.1 - pie::PIE / 2.0))
+            .w(px(pie::PIE))
+            .h(px(pie::PIE))
+            .child(img(base).size_full());
+        // Cursor de mão sobre fatia ou botão central.
+        if hovered.is_some() || center_hovered {
+            pie_box = pie_box.cursor_pointer();
+        }
+        // Destaque do hover numa camada própria com crossfade rápido.
+        if let Some((idx, hl)) = highlight {
+            pie_box = pie_box.child(
+                div()
+                    .absolute()
+                    .inset_0()
+                    .child(img(hl).size_full())
+                    .with_animation(
+                        format!("pie-hover-{seq}-{idx}"),
+                        Animation::new(Duration::from_millis(120))
+                            .with_easing(ease_out_quint()),
+                        |el, delta| el.opacity(delta),
+                    ),
+            );
+        }
+        // Rótulos como divs GPUI (tema + emoji de verdade, sem contorno):
+        // emoji do som (ou ♪) + nome curto sobre cada fatia. O emoji herda
+        // a cor do texto (branco no hover).
+        let white = open_gpui::rgb(0xffffff);
+        let n = slices.len();
+        for (i, (label, emoji)) in slices.iter().enumerate() {
+            let (mx, my) = pie::slice_mid(i, n);
+            let is_hovered = hovered == Some(i);
+            pie_box = pie_box.child(
+                div()
+                    .absolute()
+                    .left(px(mx - 55.0))
+                    .top(px(my - 32.0))
+                    .w(px(110.0))
+                    .h(px(64.0))
+                    .flex()
+                    .flex_col()
+                    .items_center()
+                    .justify_center()
+                    .text_color(if is_hovered { white } else { theme::text() })
+                    .child(super::library::pad_emoji(emoji, px(26.0), &self.shared))
+                    .child(
+                        div()
+                            .text_sm()
+                            .font_weight(open_gpui::FontWeight::SEMIBOLD)
+                            .truncate()
+                            .child(pie::short_label(label)),
+                    ),
+            );
+        }
+        // Centro: nome + (■ só com áudio tocando) + contagem. O hover
+        // preenche o fundo com accent (igual às fatias), sem borda.
+        let stop_fg = if !playing {
+            theme::muted()
+        } else if center_hovered {
+            open_gpui::rgb(0xffffff)
+        } else {
+            theme::accent()
+        };
+        if center_hovered && playing {
+            pie_box = pie_box.child(
+                div()
+                    .absolute()
+                    .left(px(pie::CENTER - 69.0))
+                    .top(px(pie::CENTER - 69.0))
+                    .w(px(138.0))
+                    .h(px(138.0))
+                    .rounded(px(999.0))
+                    .bg(theme::accent())
+                    .with_animation(
+                        format!("pie-center-{seq}"),
+                        Animation::new(Duration::from_millis(120))
+                            .with_easing(ease_out_quint()),
+                        |el, delta| el.opacity(delta),
+                    ),
+            );
+        }
+        pie_box = pie_box.child(
             div()
                 .absolute()
-                .left(px(local.0 - pie::PIE / 2.0))
-                .top(px(local.1 - pie::PIE / 2.0))
-                .w(px(pie::PIE))
-                .h(px(pie::PIE))
-                .child(img(image).size_full()),
-        )
+                .left(px(pie::CENTER - 69.0))
+                .top(px(pie::CENTER - 69.0))
+                .w(px(138.0))
+                .h(px(138.0))
+                .flex()
+                .flex_col()
+                .items_center()
+                .justify_center()
+                .gap_1()
+                .child(
+                    div()
+                        .text_sm()
+                        .font_weight(open_gpui::FontWeight::BOLD)
+                        .text_color(if center_hovered && playing {
+                            open_gpui::rgb(0xffffff)
+                        } else {
+                            theme::text()
+                        })
+                        .child("Klipp".to_string()),
+                )
+                .children(playing.then(|| {
+                    div()
+                        .text_xl()
+                        .text_color(stop_fg)
+                        .child("■".to_string())
+                }))
+                .child(
+                    div()
+                        .text_xs()
+                        .text_color(if center_hovered && playing {
+                            open_gpui::rgb(0xffffff)
+                        } else {
+                            theme::muted()
+                        })
+                        .child(format!("{total}")),
+                ),
+        );
+        // Fade-in ao mostrar (~150ms), fade-out rápido ao esconder (~110ms).
+        // Por último (anima o conjunto); chaves com `seq`: cada ativação
+        // remonta e toca do zero.
+        let pie_box = if fading {
+            pie_box.with_animation(
+                format!("pie-hide-{seq}"),
+                Animation::new(Duration::from_millis(110))
+                    .with_easing(ease_out_quint()),
+                |el, delta| el.opacity(1.0 - delta),
+            )
+        } else {
+            pie_box.with_animation(
+                format!("pie-show-{seq}"),
+                Animation::new(Duration::from_millis(150))
+                    .with_easing(ease_out_quint()),
+                |el, delta| el.opacity(delta),
+            )
+        };
+
+        root.child(pie_box)
     }
 }

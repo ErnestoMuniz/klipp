@@ -44,25 +44,26 @@ pub struct Shared {
     /// Âncora do pie em coordenadas globais do desktop (soma de todos os
     /// displays). Cada janela de overlay converte para seu espaço local.
     pub overlay_anchor: Option<(f32, f32)>,
-    /// A âncora veio do XWayland (aproximada: layout/escala do X podem
-    /// divergir do Wayland). O primeiro mouse_move real confirma a posição
-    /// exata e limpa o flag.
+    /// A âncora veio de fonte aproximada. O primeiro mouse_move real
+    /// confirma a posição exata e limpa o flag.
     pub anchor_needs_confirm: bool,
-    /// Valor bruto do XWayland usado na âncora (para calibrar o offset
-    /// X→Wayland no primeiro evento real).
+    /// Legado do cursor XWayland (removido na troca para mouse-coords).
     pub anchor_x: Option<(f32, f32)>,
-    /// Offset calibrado X→Wayland (wayland - x). Aprendido no primeiro uso
-    /// e reaplicado nas próximas ativações: dispensa o "jiggle".
     pub cursor_calib: Option<(f32, f32)>,
-    /// Tamanho combinado do desktop (união dos displays), para escolher o
-    /// display X correto na sonda.
     pub desktop_size: Option<(u32, u32)>,
-    /// Sonda do display X concluída (ver `x_display`).
     pub x_probed: bool,
-    /// Display X vivo escolhido pela sonda (`None` = sem XWayland útil).
     pub x_display: Option<String>,
+    /// Geração de ativação do overlay (para reiniciar animações de show).
+    pub overlay_seq: u64,
+    /// Fechando com fade-out: continua renderizando por ~110ms.
+    pub overlay_fading: bool,
+    pub overlay_fade_start: u128,
     pub pie_hovered: Option<usize>,
+    /// Cursor sobre o botão central (stop): destaque + ação.
+    pub center_hovered: bool,
     pub play_request: Option<String>,
+    /// Pedido de parar o áudio (botão central do pie).
+    pub stop_request: bool,
     pub confirm_request: bool,
     pub show_hint: bool,
     pub search: String,
@@ -163,8 +164,13 @@ impl Shared {
             desktop_size: None,
             x_probed: false,
             x_display: None,
+            overlay_seq: 0,
+            overlay_fading: false,
+            overlay_fade_start: 0,
             pie_hovered: None,
+            center_hovered: false,
             play_request: None,
+            stop_request: false,
             confirm_request: false,
             show_hint: true,
             search: String::new(),
@@ -224,5 +230,45 @@ impl Shared {
     /// Marca o estado como sujo para forçar `cx.notify()` no próximo tick.
     pub fn bump(&mut self) {
         self.version += 1;
+    }
+
+    /// Sons favoritos (o overlay mostra só estes): tudo menos `unfavorited`.
+    pub fn favorite_sounds(&self) -> Vec<Sound> {
+        self.sounds
+            .iter()
+            .filter(|s| !self.unfavorited.contains(&s.name))
+            .cloned()
+            .collect()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::core::settings::Settings;
+
+    fn sound(name: &str) -> Sound {
+        Sound {
+            name: name.into(),
+            path: std::path::PathBuf::from(name),
+            duration_secs: None,
+            modified_secs: 0,
+            display: None,
+            emoji: "♪".into(),
+        }
+    }
+
+    #[test]
+    fn overlay_mostra_so_favoritos() {
+        let mut s = Shared::new(&Settings::default());
+        s.sounds = vec![sound("a"), sound("b"), sound("c")];
+        assert_eq!(s.favorite_sounds().len(), 3);
+        s.unfavorited.insert("b".into());
+        let fav: Vec<_> = s
+            .favorite_sounds()
+            .iter()
+            .map(|x| x.name.clone())
+            .collect();
+        assert_eq!(fav, vec!["a".to_string(), "c".to_string()]);
     }
 }

@@ -71,6 +71,11 @@ pub fn set_light(light: bool) {
     LIGHT_MODE.store(light, Ordering::Relaxed);
 }
 
+/// Tema claro ativo? (o overlay lê para colorir o pie).
+pub fn is_light() -> bool {
+    LIGHT_MODE.load(Ordering::Relaxed)
+}
+
 fn pal() -> &'static Palette {
     if LIGHT_MODE.load(Ordering::Relaxed) {
         &LIGHT
