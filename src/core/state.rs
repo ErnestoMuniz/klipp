@@ -47,12 +47,6 @@ pub struct Shared {
     /// A âncora veio de fonte aproximada. O primeiro mouse_move real
     /// confirma a posição exata e limpa o flag.
     pub anchor_needs_confirm: bool,
-    /// Legado do cursor XWayland (removido na troca para mouse-coords).
-    pub anchor_x: Option<(f32, f32)>,
-    pub cursor_calib: Option<(f32, f32)>,
-    pub desktop_size: Option<(u32, u32)>,
-    pub x_probed: bool,
-    pub x_display: Option<String>,
     /// Geração de ativação do overlay (para reiniciar animações de show).
     pub overlay_seq: u64,
     /// Fechando com fade-out: continua renderizando por ~110ms.
@@ -159,11 +153,6 @@ impl Shared {
             overlay_active: false,
             overlay_anchor: None,
             anchor_needs_confirm: false,
-            anchor_x: None,
-            cursor_calib: None,
-            desktop_size: None,
-            x_probed: false,
-            x_display: None,
             overlay_seq: 0,
             overlay_fading: false,
             overlay_fade_start: 0,

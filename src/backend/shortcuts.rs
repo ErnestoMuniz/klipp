@@ -142,33 +142,51 @@ pub async fn run(shared: Arc<std::sync::Mutex<Shared>>, preferred: String) -> an
                 let Some(event) = event else { break };
                 log::info!("atalho activated: {}", event.shortcut_id());
                 if event.shortcut_id() == OVERLAY_ID {
-                    // Posição do cursor via display X sondado + offset
-                    // calibrado: o pie já abre no monitor certo. Antes da
-                    // sonda (ou sem XWayland útil), None + fallback.
-                    let (probed, x_display, calib) = {
-                        let s = shared.lock().unwrap();
-                        (s.x_probed, s.x_display.clone(), s.cursor_calib)
-                    };
-                    let x = if probed {
-                        x_display
-                            .as_deref()
-                            .and_then(|d| crate::backend::cursor::pointer_on(Some(d)))
-                    } else {
-                        None
-                    };
-                    log::info!("atalho cursor: {x:?}");
+                    // Ativa na hora (fallback central no primário) e resolve
+                    // a posição exata em thread dedicada: `get_position()` é
+                    // bloqueante e não pode travar o executor.
                     log::info!("atalho opts: {:?}", event.options());
                     set_shared(&shared, |s| {
-                        let (ox, oy) = calib.unwrap_or((0.0, 0.0));
-                        let anchor = x.map(|p| (p.0 + ox, p.1 + oy));
+                        // Com áudio tocando, o centro (stop) já nasce
+                        // selecionado: soltar o atalho para na hora, sem
+                        // precisar mirar.
+                        let stopping = s.playing.is_some();
                         s.overlay_active = true;
-                        s.overlay_anchor = anchor;
-                        s.anchor_x = x;
-                        s.anchor_needs_confirm = anchor.is_some();
+                        s.overlay_fading = false;
+                        s.overlay_seq = s.overlay_seq.wrapping_add(1);
+                        s.overlay_anchor = None;
+                        s.anchor_needs_confirm = true;
                         s.pie_hovered = None;
+                        s.center_hovered = stopping;
                         s.confirm_request = false;
                         s.bump();
                     });
+                    let shared_bg = shared.clone();
+                    std::thread::Builder::new()
+                        .name("klipp-cursor".into())
+                        .spawn(move || {
+                            match mouse_coords::get_position() {
+                                Ok(pos) => {
+                                    log::info!(
+                                        "atalho cursor: ({}, {})",
+                                        pos.x,
+                                        pos.y
+                                    );
+                                    set_shared(&shared_bg, |s| {
+                                        if s.overlay_active {
+                                            s.overlay_anchor =
+                                                Some((pos.x as f32, pos.y as f32));
+                                            s.anchor_needs_confirm = false;
+                                            s.bump();
+                                        }
+                                    });
+                                }
+                                Err(err) => {
+                                    log::info!("atalho cursor indisponível: {err}");
+                                }
+                            }
+                        })
+                        .ok();
                 }
             }
             event = deactivated.next() => {

@@ -101,30 +101,6 @@ impl MainWindow {
         // (a enumeração Wayland pode chegar incompleta na largada).
         entity.ensure_overlays(cx);
 
-        // Sonda do display X (uma vez, em background): escolhe o XWayland
-        // pelo tamanho da raiz. O atalho usa o resultado para ancorar.
-        let shared_x = entity.shared.clone();
-        std::thread::Builder::new()
-            .name("klipp-xprobe".into())
-            .spawn(move || {
-                let mut size = None;
-                for _ in 0..100 {
-                    size = shared_x.lock().unwrap().desktop_size;
-                    if size.is_some() {
-                        break;
-                    }
-                    std::thread::sleep(std::time::Duration::from_millis(100));
-                }
-                if let Some(desktop) = size {
-                    let found = crate::backend::cursor::discover(desktop);
-                    let mut s = shared_x.lock().unwrap();
-                    s.x_display = found;
-                    s.x_probed = true;
-                    s.bump();
-                }
-            })
-            .ok();
-
         entity.spawn_background_tasks(cx);
         entity.spawn_poller(cx);
         entity.spawn_fs_watcher();
@@ -138,11 +114,13 @@ impl MainWindow {
     fn ensure_overlays(&self, cx: &mut Context<Self>) {
         use std::collections::HashSet;
         let displays = cx.displays();
-        let want: HashSet<Option<open_gpui::DisplayId>> = if displays.is_empty() {
-            HashSet::from([None])
-        } else {
-            displays.iter().map(|d| Some(d.id())).collect()
-        };
+        // Sem displays (enumeração ainda vazia): tenta de novo no próximo
+        // tick em vez de criar janela fantasma `None`.
+        if displays.is_empty() {
+            return;
+        }
+        let want: HashSet<Option<open_gpui::DisplayId>> =
+            displays.iter().map(|d| Some(d.id())).collect();
         // Fecha obsoletas fora do lock.
         let stale: Vec<WindowHandle<OverlayEntity>> = {
             let guard = self.overlay.lock().unwrap();
@@ -348,33 +326,8 @@ impl MainWindow {
     fn on_tick(&mut self, cx: &mut Context<Self>) {
         // Monitores que aparecem depois da largada ganham overlay aqui.
         self.ensure_overlays(cx);
-        // Tamanho combinado do desktop (para a sonda do display X).
-        {
-            let mut bounds: Option<(f32, f32, f32, f32)> = None;
-            for d in cx.displays() {
-                let b = d.bounds();
-                let x0 = f32::from(b.origin.x);
-                let y0 = f32::from(b.origin.y);
-                let x1 = x0 + f32::from(b.size.width);
-                let y1 = y0 + f32::from(b.size.height);
-                bounds = Some(match bounds {
-                    Some((ax0, ay0, ax1, ay1)) => {
-                        (ax0.min(x0), ay0.min(y0), ax1.max(x1), ay1.max(y1))
-                    }
-                    None => (x0, y0, x1, y1),
-                });
-            }
-            if let Some((x0, y0, x1, y1)) = bounds {
-                let size = ((x1 - x0).max(0.0) as u32, (y1 - y0).max(0.0) as u32);
-                let mut s = self.shared.lock().unwrap();
-                if s.desktop_size != Some(size) {
-                    s.desktop_size = Some(size);
-                }
-            }
-        }
-        // Âncora aproximada? Fixa a exata assim que o cursor estiver sobre
-        // um overlay (sem precisar de movimento).
-        self.confirm_anchor_from_hover(cx);
+        // Âncora exata (thread) e hover: sincroniza as janelas de overlay.
+        self.sync_overlay_windows(cx);
         let mut s = self.shared.lock().unwrap();
 
         if let Some(name) = s.play_request.take() {
@@ -384,21 +337,40 @@ impl MainWindow {
                     .play(sound.path.clone(), sound.name.clone(), shared);
             }
         }
+        if s.stop_request {
+            s.stop_request = false;
+            self.engine.stop();
+        }
 
         if s.confirm_request {
             s.confirm_request = false;
-            if s.overlay_active {
+            if s.overlay_active && !s.overlay_fading {
                 if let Some(idx) = s.pie_hovered {
-                    if let Some(sound) = s.sounds.get(idx) {
+                    if let Some(sound) = s.favorite_sounds().get(idx) {
                         s.play_request = Some(sound.name.clone());
                     }
+                } else if s.center_hovered && s.playing.is_some() {
+                    // Soltou o atalho sobre o botão central: para o áudio.
+                    s.stop_request = true;
                 }
-                s.overlay_active = false;
-                s.overlay_anchor = None;
-                s.anchor_needs_confirm = false;
-                s.pie_hovered = None;
+                // Fecha com fade-out rápido (~110ms): mantém montado, o
+                // trecho abaixo desmonta (ver `overlay_fading`).
+                s.overlay_fading = true;
+                s.overlay_fade_start = super::format::now_ms();
                 s.bump();
             }
+        }
+        // Fim do fade-out: desmonta o overlay (janelas voltam a 1x1).
+        if s.overlay_fading
+            && super::format::now_ms().saturating_sub(s.overlay_fade_start) >= 110
+        {
+            s.overlay_active = false;
+            s.overlay_fading = false;
+            s.overlay_anchor = None;
+            s.anchor_needs_confirm = false;
+            s.pie_hovered = None;
+            s.center_hovered = false;
+            s.bump();
         }
 
         let overlay_active = s.overlay_active;
@@ -480,14 +452,14 @@ impl MainWindow {
         }
     }
 
-    /// Confirma a âncora via hover: quando o overlay mapeia sob o cursor, o
-    /// compositor manda enter com a posição exata — mesmo parado. Com isso o
-    /// pie já nasce no lugar certo, sem "jiggle". Também aprende o offset
-    /// X→Wayland para as próximas ativações.
-    fn confirm_anchor_from_hover(&self, cx: &mut Context<Self>) {
-        if !self.shared.lock().unwrap().anchor_needs_confirm {
+    /// Sincroniza as janelas de overlay enquanto ativo: confirma a âncora
+    /// via hover quando pendente e repinta todas (a âncora exata chega por
+    /// thread dedicada, fora do ciclo de repaint das janelas).
+    fn sync_overlay_windows(&self, cx: &mut Context<Self>) {
+        if !self.shared.lock().unwrap().overlay_active {
             return;
         }
+        let needs = self.shared.lock().unwrap().anchor_needs_confirm;
         let origins: std::collections::HashMap<Option<open_gpui::DisplayId>, (f32, f32)> =
             cx.displays()
                 .iter()
@@ -496,34 +468,25 @@ impl MainWindow {
                     (Some(d.id()), (f32::from(o.x), f32::from(o.y)))
                 })
                 .collect();
+        let shared = self.shared.clone();
         for (handle, target) in self.overlay.lock().unwrap().iter() {
-            let Some((ox, oy)) = origins.get(target).copied() else {
-                continue;
-            };
-            let hovered = handle.update(cx, |_, window, _| {
-                if window.is_mouse_in_window() {
-                    let p = window.mouse_position();
-                    Some((f32::from(p.x), f32::from(p.y)))
-                } else {
-                    None
-                }
-            });
-            if let Ok(Some((lx, ly))) = hovered {
-                let pos = (lx + ox, ly + oy);
-                let mut s = self.shared.lock().unwrap();
-                if let Some(x) = s.anchor_x.take() {
-                    let (dx, dy) = (pos.0 - x.0, pos.1 - x.1);
-                    if dx.hypot(dy) < 250.0 {
-                        s.cursor_calib = Some((dx, dy));
-                        log::info!("overlay calib: ({dx:.0}, {dy:.0})");
+            let origin = origins.get(target).copied();
+            let _ = handle.update(cx, |_, window, cx| {
+                if needs {
+                    if let Some((ox, oy)) = origin {
+                        if window.is_mouse_in_window() {
+                            let p = window.mouse_position();
+                            let pos = (f32::from(p.x) + ox, f32::from(p.y) + oy);
+                            let mut s = shared.lock().unwrap();
+                            s.anchor_needs_confirm = false;
+                            s.overlay_anchor = Some(pos);
+                            s.bump();
+                            log::info!("overlay âncora (hover): ({:.0}, {:.0})", pos.0, pos.1);
+                        }
                     }
                 }
-                s.anchor_needs_confirm = false;
-                s.overlay_anchor = Some(pos);
-                s.bump();
-                log::info!("overlay âncora (hover): ({:.0}, {:.0})", pos.0, pos.1);
-                break;
-            }
+                cx.notify();
+            });
         }
     }
 
@@ -552,9 +515,9 @@ impl MainWindow {
                 window.resize(size);
                 if active {
                     log::info!("overlay janela {target:?}: display {bounds:?}");
-                    // Garante topo + foco de entrada no KDE (layer-shell pode
-                    // ficar atrás sem activate).
-                    window.activate_window();
+                    // Sem activate_window: layer Overlay já fica no topo por
+                    // protocolo, e pedir ativação só gera erro do backend
+                    // ("activation token received with no pending activation").
                     if window.is_mouse_in_window() {
                         let mut s = shared.lock().unwrap();
                         if s.overlay_anchor.is_none() {
@@ -572,7 +535,6 @@ impl MainWindow {
                                 anchor.1
                             );
                             s.overlay_anchor = Some(anchor);
-                            s.anchor_x = None;
                             s.anchor_needs_confirm = false;
                             s.bump();
                         }
@@ -1067,6 +1029,9 @@ impl MainWindow {
     pub(crate) fn set_theme(&self, theme: &str, cx: &mut Context<Self>) {
         self.shared.lock().unwrap().theme = theme.to_string();
         self.shared.lock().unwrap().bump();
+        // Transições capturam cores: sem reset, elementos com transição
+        // (cards, inputs) congelam a paleta antiga ao trocar de tema.
+        gpui_animation::reset_all_transitions();
         self.persist_prefs();
         cx.notify();
     }
