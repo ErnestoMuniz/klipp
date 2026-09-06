@@ -412,14 +412,16 @@ mod tests {
         engine.play("b.mp3".into(), "b".into(), shared.clone());
         // A época síncrona já é a do último play.
         assert_eq!(shared.lock().unwrap().play_seq, 2);
-        // O erro final é sempre o do dono (qualquer ordem de chegada).
+        // O erro final é sempre o do dono: ignora o "a:" transitório caso
+        // o primeiro thread reporte antes do segundo existir.
         let deadline = std::time::Instant::now() + std::time::Duration::from_secs(3);
         loop {
-            if let Some(err) = shared.lock().unwrap().last_error.clone() {
-                assert!(err.starts_with("b:"), "erro do dono: {err}");
+            if let Some(err) = shared.lock().unwrap().last_error.clone()
+                && err.starts_with("b:")
+            {
                 break;
             }
-            assert!(std::time::Instant::now() < deadline, "threads não reportaram");
+            assert!(std::time::Instant::now() < deadline, "dono não reportou");
             std::thread::sleep(std::time::Duration::from_millis(10));
         }
     }

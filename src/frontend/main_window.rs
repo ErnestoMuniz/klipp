@@ -1,11 +1,12 @@
 use std::sync::{Arc, Mutex};
 
 use open_gpui::{
-    div, px, size, Context, CursorStyle, FocusHandle, IntoElement, MouseButton, Render,
-    ResizeEdge, Styled, Window, WindowBackgroundAppearance, WindowBounds, WindowDecorations,
-    WindowHandle, WindowKind, WindowOptions,
+    Context, CursorStyle, FocusHandle, IntoElement, MouseButton, Render, ResizeEdge, Styled,
+    Window, WindowBackgroundAppearance, WindowBounds, WindowDecorations, WindowHandle, WindowKind,
+    WindowOptions, div,
     layer_shell::{Anchor, KeyboardInteractivity, Layer, LayerShellOptions},
     prelude::*,
+    px, size,
 };
 
 use super::assets::AppAssets;
@@ -16,8 +17,8 @@ use super::theme;
 use super::titlebar::titlebar;
 use super::ui::{hint_banner, status_banner};
 use crate::backend::{self, AudioGraph, Engine};
-use crate::core::state::{Shared, Sound};
 use crate::core::i18n::{t, t_fmt};
+use crate::core::state::{Shared, Sound};
 
 /// Campo de texto customizado (inputs desenhados à mão, sem seleção nativa).
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -145,10 +146,7 @@ impl MainWindow {
         for handle in stale {
             log::info!("overlay: fechando janela obsoleta");
             let _ = handle.update(cx, |_, window, _| window.remove_window());
-            self.overlay
-                .lock()
-                .unwrap()
-                .retain(|(h, _)| h != &handle);
+            self.overlay.lock().unwrap().retain(|(h, _)| h != &handle);
         }
         let missing: Vec<Option<open_gpui::DisplayId>> = {
             let guard = self.overlay.lock().unwrap();
@@ -168,8 +166,7 @@ impl MainWindow {
             log::info!("overlay: display {:?} bounds {:?}", d.id(), d.bounds());
         }
         for target in missing {
-            let is_fallback =
-                target == primary_id || (primary_id.is_none() && target.is_none());
+            let is_fallback = target == primary_id || (primary_id.is_none() && target.is_none());
             if Self::open_overlay(
                 self.overlay.clone(),
                 self.overlay_ids.clone(),
@@ -188,9 +185,7 @@ impl MainWindow {
     /// Abre uma janela de overlay para `target` e registra em `overlays`.
     /// Retorna `Err` se nem LayerShell nem o fallback PopUp abriram.
     fn open_overlay(
-        overlays: Arc<
-            Mutex<Vec<(WindowHandle<OverlayEntity>, Option<open_gpui::DisplayId>)>>,
-        >,
+        overlays: Arc<Mutex<Vec<(WindowHandle<OverlayEntity>, Option<open_gpui::DisplayId>)>>>,
         overlay_ids: Arc<Mutex<Vec<open_gpui::EntityId>>>,
         shared: Arc<Mutex<Shared>>,
         target: Option<open_gpui::DisplayId>,
@@ -206,7 +201,13 @@ impl MainWindow {
             overlay_options(WindowKind::LayerShell(layer_opts), target),
             move |_window, cx| {
                 let e = cx.new(|cx| {
-                    OverlayEntity::new(shared_layer.clone(), ids_layer.clone(), target, is_fallback, cx)
+                    OverlayEntity::new(
+                        shared_layer.clone(),
+                        ids_layer.clone(),
+                        target,
+                        is_fallback,
+                        cx,
+                    )
                 });
                 let mut ids = ids_layer.lock().unwrap();
                 if !ids.contains(&e.entity_id()) {
@@ -217,22 +218,25 @@ impl MainWindow {
         )
         .or_else(|_| {
             // Compositor sem LayerShell: cai para uma janela xdg normal (PopUp).
-            cx.open_window(overlay_options(WindowKind::PopUp, target), move |_window, cx| {
-                let e = cx.new(|cx| {
-                    OverlayEntity::new(
-                        shared_popup.clone(),
-                        ids_popup.clone(),
-                        target,
-                        is_fallback,
-                        cx,
-                    )
-                });
-                let mut ids = ids_popup.lock().unwrap();
-                if !ids.contains(&e.entity_id()) {
-                    ids.push(e.entity_id());
-                }
-                e
-            })
+            cx.open_window(
+                overlay_options(WindowKind::PopUp, target),
+                move |_window, cx| {
+                    let e = cx.new(|cx| {
+                        OverlayEntity::new(
+                            shared_popup.clone(),
+                            ids_popup.clone(),
+                            target,
+                            is_fallback,
+                            cx,
+                        )
+                    });
+                    let mut ids = ids_popup.lock().unwrap();
+                    if !ids.contains(&e.entity_id()) {
+                        ids.push(e.entity_id());
+                    }
+                    e
+                },
+            )
         })
         .map(|handle| {
             log::info!("overlay: janela criada para display {target:?}");
@@ -276,9 +280,7 @@ impl MainWindow {
                 s.mic_source = mic_label.clone();
                 s.mic_sources = backend::list_sources();
                 // Se a fonte salva desplugou, volta ao auto-detect resolvido.
-                if !preferred.is_empty()
-                    && !s.mic_sources.iter().any(|(n, _)| n == &preferred)
-                {
+                if !preferred.is_empty() && !s.mic_sources.iter().any(|(n, _)| n == &preferred) {
                     s.mic_source = mic_label.clone();
                 }
                 s.mic = match result {
@@ -314,19 +316,22 @@ impl MainWindow {
         // Aplica pedidos (play/confirm/resize do overlay) e re-renderiza.
         // ~15fps para as animações (caret, EQ) sem gastar CPU à toa.
         let shared_auto = self.shared.clone();
-        cx.spawn(|this: open_gpui::WeakEntity<Self>, cx: &mut open_gpui::AsyncApp| {
-            let cx = cx.clone();
-            async move {
-                maybe_autoplay(&shared_auto, &cx, &this).await;                loop {
-                    cx.background_executor()
-                        .timer(std::time::Duration::from_millis(66))
-                        .await;
-                    let _ = cx.update(|app| {
-                        let _ = this.update(app, |this, cx| this.on_tick(cx));
-                    });
+        cx.spawn(
+            |this: open_gpui::WeakEntity<Self>, cx: &mut open_gpui::AsyncApp| {
+                let cx = cx.clone();
+                async move {
+                    maybe_autoplay(&shared_auto, &cx, &this).await;
+                    loop {
+                        cx.background_executor()
+                            .timer(std::time::Duration::from_millis(66))
+                            .await;
+                        let _ = cx.update(|app| {
+                            let _ = this.update(app, |this, cx| this.on_tick(cx));
+                        });
+                    }
                 }
-            }
-        })
+            },
+        )
         .detach();
     }
 
@@ -373,9 +378,7 @@ impl MainWindow {
             }
         }
         // Fim do fade-out: desmonta o overlay (janelas voltam a 1x1).
-        if s.overlay_fading
-            && super::format::now_ms().saturating_sub(s.overlay_fade_start) >= 110
-        {
+        if s.overlay_fading && super::format::now_ms().saturating_sub(s.overlay_fade_start) >= 110 {
             s.overlay_active = false;
             s.overlay_fading = false;
             s.overlay_anchor = None;
@@ -388,9 +391,7 @@ impl MainWindow {
         let overlay_active = s.overlay_active;
         let version = s.version;
         // Arrastar arquivos externos: reflete no overlay via poll (~15fps).
-        let ext_drag = cx
-            .active_drag_value::<open_gpui::ExternalPaths>()
-            .is_some();
+        let ext_drag = cx.active_drag_value::<open_gpui::ExternalPaths>().is_some();
         if ext_drag != s.drop_active {
             s.drop_active = ext_drag;
             s.bump();
@@ -413,25 +414,19 @@ impl MainWindow {
             s.settings_closing = false;
             s.bump();
         }
-        if s.browse_closing
-            && super::format::now_ms().saturating_sub(s.browse_anim_start) >= 240
-        {
+        if s.browse_closing && super::format::now_ms().saturating_sub(s.browse_anim_start) >= 240 {
             s.browse_open = false;
             s.browse_closing = false;
             s.browse_focused = false;
             s.bump();
         }
         // Fim do fade de saída dos dialogs: desmonta.
-        if s.about_closing
-            && super::format::now_ms().saturating_sub(s.about_anim_start) >= 200
-        {
+        if s.about_closing && super::format::now_ms().saturating_sub(s.about_anim_start) >= 200 {
             s.about_open = false;
             s.about_closing = false;
             s.bump();
         }
-        if s.editor_closing
-            && super::format::now_ms().saturating_sub(s.editor_anim_start) >= 200
-        {
+        if s.editor_closing && super::format::now_ms().saturating_sub(s.editor_anim_start) >= 200 {
             s.editor_open = false;
             s.editor_closing = false;
             s.editor_name_focused = false;
@@ -472,14 +467,14 @@ impl MainWindow {
             return;
         }
         let needs = self.shared.lock().unwrap().anchor_needs_confirm;
-        let origins: std::collections::HashMap<Option<open_gpui::DisplayId>, (f32, f32)> =
-            cx.displays()
-                .iter()
-                .map(|d| {
-                    let o = d.bounds().origin;
-                    (Some(d.id()), (f32::from(o.x), f32::from(o.y)))
-                })
-                .collect();
+        let origins: std::collections::HashMap<Option<open_gpui::DisplayId>, (f32, f32)> = cx
+            .displays()
+            .iter()
+            .map(|d| {
+                let o = d.bounds().origin;
+                (Some(d.id()), (f32::from(o.x), f32::from(o.y)))
+            })
+            .collect();
         let shared = self.shared.clone();
         for (handle, target) in self.overlay.lock().unwrap().iter() {
             let origin = origins.get(target).copied();
@@ -518,7 +513,9 @@ impl MainWindow {
         };
         for (handle, target) in self.overlay.lock().unwrap().iter() {
             let bounds = bounds_by_display.get(target).copied();
-            let size = bounds.map(|b| b.size).unwrap_or(open_gpui::size(px(1.0), px(1.0)));
+            let size = bounds
+                .map(|b| b.size)
+                .unwrap_or(open_gpui::size(px(1.0), px(1.0)));
             // Origem real do display (window.bounds() de layer-shell mente:
             // sempre 1x1@(0,0)).
             let origin = bounds.map(|b| b.origin);
@@ -541,11 +538,7 @@ impl MainWindow {
                                 ),
                                 None => (f32::from(p.x), f32::from(p.y)),
                             };
-                            log::info!(
-                                "overlay âncora (pré): ({:.0}, {:.0})",
-                                anchor.0,
-                                anchor.1
-                            );
+                            log::info!("overlay âncora (pré): ({:.0}, {:.0})", anchor.0, anchor.1);
                             s.overlay_anchor = Some(anchor);
                             s.anchor_needs_confirm = false;
                             s.bump();
@@ -705,12 +698,7 @@ impl MainWindow {
     }
 
     /// Soltar o botão no input: arrasto além de 4px seleciona tudo.
-    pub(crate) fn input_mouse_up(
-        &mut self,
-        field: TextField,
-        x: f32,
-        cx: &mut Context<Self>,
-    ) {
+    pub(crate) fn input_mouse_up(&mut self, field: TextField, x: f32, cx: &mut Context<Self>) {
         let dragged = match self.text_drag.take() {
             Some((f, x0)) => f == field && (x - x0).abs() > 4.0,
             None => false,
@@ -1341,12 +1329,12 @@ impl Render for MainWindow {
             .flex_col()
             .bg(theme::bg())
             .text_color(theme::text())
-            .on_mouse_move(cx.listener(
-                |this, event: &open_gpui::MouseMoveEvent, _window, cx| {
+            .on_mouse_move(
+                cx.listener(|this, event: &open_gpui::MouseMoveEvent, _window, cx| {
                     this.on_vol_move(f32::from(event.position.x), cx);
                     this.on_progress_move(f32::from(event.position.x), cx);
-                },
-            ))
+                }),
+            )
             .on_mouse_down(
                 MouseButton::Left,
                 cx.listener(|this, _event, window, cx| {
@@ -1362,11 +1350,11 @@ impl Render for MainWindow {
                     this.end_progress_drag();
                 }),
             )
-            .on_drop(cx.listener(
-                |this, paths: &open_gpui::ExternalPaths, _window, cx| {
+            .on_drop(
+                cx.listener(|this, paths: &open_gpui::ExternalPaths, _window, cx| {
                     this.import_dropped(paths.paths(), cx);
-                },
-            ))
+                }),
+            )
             .child(titlebar(window, cx))
             .child(self.toolbar(
                 sounds.len(),
@@ -1385,7 +1373,21 @@ impl Render for MainWindow {
             ))
             .child(hint_banner(&lang, &shortcut, show_hint, cx))
             .child(status_banner(last_error))
-            .child(div().flex_1().overflow_hidden().px_4().pb_2().child(content))
+            .child(
+                div()
+                    .id("library-scroll")
+                    .flex_1()
+                    .overflow_y_scroll()
+                    .px_4()
+                    .pb_2()
+                    .child(content)
+                    // Respiro final: com o player flutuante, a última
+                    // fileira precisa rolar para cima dele.
+                    .child(
+                        div().h(px(super::player::PLAYER_CLEARANCE)).flex_shrink_0(),
+                    ),
+            )
+            .child(super::player::bottom_fade())
             .child(self.bottom_stack(
                 playing.as_ref(),
                 playing_label.as_deref(),
@@ -1439,50 +1441,90 @@ fn resize_handles(cx: &mut Context<MainWindow>) -> Vec<open_gpui::AnyElement> {
             "resize-top",
             ResizeEdge::Top,
             CursorStyle::ResizeUpDown,
-            div().absolute().top(px(0.0)).left(px(C)).right(px(C)).h(px(T)),
+            div()
+                .absolute()
+                .top(px(0.0))
+                .left(px(C))
+                .right(px(C))
+                .h(px(T)),
         ),
         edge(
             "resize-bottom",
             ResizeEdge::Bottom,
             CursorStyle::ResizeUpDown,
-            div().absolute().bottom(px(0.0)).left(px(C)).right(px(C)).h(px(T)),
+            div()
+                .absolute()
+                .bottom(px(0.0))
+                .left(px(C))
+                .right(px(C))
+                .h(px(T)),
         ),
         edge(
             "resize-left",
             ResizeEdge::Left,
             CursorStyle::ResizeLeftRight,
-            div().absolute().left(px(0.0)).top(px(C)).bottom(px(C)).w(px(T)),
+            div()
+                .absolute()
+                .left(px(0.0))
+                .top(px(C))
+                .bottom(px(C))
+                .w(px(T)),
         ),
         edge(
             "resize-right",
             ResizeEdge::Right,
             CursorStyle::ResizeLeftRight,
-            div().absolute().right(px(0.0)).top(px(C)).bottom(px(C)).w(px(T)),
+            div()
+                .absolute()
+                .right(px(0.0))
+                .top(px(C))
+                .bottom(px(C))
+                .w(px(T)),
         ),
         // Cantos (área maior para pegar fácil)
         edge(
             "resize-tl",
             ResizeEdge::TopLeft,
             CursorStyle::ResizeUpLeftDownRight,
-            div().absolute().top(px(0.0)).left(px(0.0)).w(px(C)).h(px(C)),
+            div()
+                .absolute()
+                .top(px(0.0))
+                .left(px(0.0))
+                .w(px(C))
+                .h(px(C)),
         ),
         edge(
             "resize-tr",
             ResizeEdge::TopRight,
             CursorStyle::ResizeUpRightDownLeft,
-            div().absolute().top(px(0.0)).right(px(0.0)).w(px(C)).h(px(C)),
+            div()
+                .absolute()
+                .top(px(0.0))
+                .right(px(0.0))
+                .w(px(C))
+                .h(px(C)),
         ),
         edge(
             "resize-bl",
             ResizeEdge::BottomLeft,
             CursorStyle::ResizeUpRightDownLeft,
-            div().absolute().bottom(px(0.0)).left(px(0.0)).w(px(C)).h(px(C)),
+            div()
+                .absolute()
+                .bottom(px(0.0))
+                .left(px(0.0))
+                .w(px(C))
+                .h(px(C)),
         ),
         edge(
             "resize-br",
             ResizeEdge::BottomRight,
             CursorStyle::ResizeUpLeftDownRight,
-            div().absolute().bottom(px(0.0)).right(px(0.0)).w(px(C)).h(px(C)),
+            div()
+                .absolute()
+                .bottom(px(0.0))
+                .right(px(0.0))
+                .w(px(C))
+                .h(px(C)),
         ),
     ]
 }

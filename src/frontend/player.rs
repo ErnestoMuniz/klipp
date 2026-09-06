@@ -13,6 +13,33 @@ const PROGRESS_W: f32 = 640.0;
 const BAR_W: f32 = PROGRESS_W / WAVEFORM_BARS as f32;
 /// Altura da área da forma de onda; a barra vai de 3px ao teto.
 const WAVE_H: f32 = 30.0;
+/// Respiro sob a biblioteca rolável: altura do player flutuante + folga,
+/// para a última fileira nunca ficar presa atrás dele.
+pub(crate) const PLAYER_CLEARANCE: f32 = 150.0;
+/// Altura da sombra inferior: maior que o respiro de propósito, para a
+/// fileira de baixo (totalmente visível) terminar já dissolvendo nela.
+const FADE_H: f32 = 220.0;
+
+/// Sombra fixa no fundo: gradiente da cor do background (opaco embaixo,
+/// transparente em cima) cobrindo os cards até a altura do player — sem
+/// cobrir o player (pintado depois). Div decorativa sem handlers:
+/// hitbox `Normal` não rouba clique/scroll dos cards de baixo.
+pub(crate) fn bottom_fade() -> impl IntoElement {
+    let bg: open_gpui::Hsla = theme::bg().into();
+    let mut transparent = bg;
+    transparent.a = 0.0;
+    div()
+        .absolute()
+        .bottom(px(0.0))
+        .left(px(0.0))
+        .right(px(0.0))
+        .h(px(FADE_H))
+        .bg(open_gpui::linear_gradient(
+            0.0,
+            open_gpui::linear_color_stop(bg, 0.0),
+            open_gpui::linear_color_stop(transparent, 1.0),
+        ))
+}
 
 impl MainWindow {
     pub(crate) fn bottom_stack(
@@ -28,7 +55,12 @@ impl MainWindow {
         cx: &mut Context<Self>,
     ) -> impl IntoElement {
         div()
-            .relative()
+            // Dock flutuante: fixo embaixo, fora do fluxo — a biblioteca
+            // rola por baixo das margens transparentes (só a barra tampa).
+            .absolute()
+            .bottom(px(0.0))
+            .left(px(0.0))
+            .right(px(0.0))
             .px_4()
             .pt_2()
             .pb_4()
@@ -40,11 +72,14 @@ impl MainWindow {
                 div()
                     .absolute()
                     .right(px(20.0))
-                    .bottom(px(88.0))
+                    .bottom(px(PLAYER_CLEARANCE))
                     .flex()
                     .flex_col()
                     .items_center()
                     .gap_3()
+                    // Botões opacos: o vão transparente entre eles também
+                    // consome o clique (evita tocar card mirando no +).
+                    .occlude()
                     .child(
                         div()
                             .id("open-folder")
@@ -127,6 +162,9 @@ impl MainWindow {
             .border_1()
             .border_color(theme::border())
             .rounded(px(14.0))
+            // Barra opaca sobre a biblioteca: consome o clique para não
+            // atravessar e tocar o card de baixo.
+            .occlude()
             .child(
                 div()
                     .flex()
