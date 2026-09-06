@@ -18,7 +18,7 @@ fn main() {
     // Spans internos do GPUI (`sum_tree::seek_internal` etc.) disparam a cada
     // layout — com repaint a 15fps viram spam infinito. Silencia alvos barulhentos.
     env_logger::Builder::from_env(env_logger::Env::default().default_filter_or(
-        "info,tracing::span=off,open_gpui_sum_tree=off,gpui_sum_tree=off,sum_tree=off,zbus::proxy=error",
+        "info,tracing::span=off,open_gpui_sum_tree=off,gpui_sum_tree=off,sum_tree=off,zbus::proxy=error,usvg=error",
     ))
     .init();
 

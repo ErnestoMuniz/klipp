@@ -31,4 +31,4 @@ cleanup() {
 trap cleanup EXIT
 
 sleep 1
-exec env RUST_LOG=info,zbus=warn,zbus::proxy=error,wgpu=warn,tracing::span=off,open_gpui_sum_tree=off,gpui_sum_tree=off,sum_tree=off "$(dirname "$0")/../target/debug/klipp" "$@"
+exec env RUST_LOG=info,zbus=warn,zbus::proxy=error,wgpu=warn,usvg=error,tracing::span=off,open_gpui_sum_tree=off,gpui_sum_tree=off,sum_tree=off "$(dirname "$0")/../target/debug/klipp" "$@"
