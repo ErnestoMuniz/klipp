@@ -1240,6 +1240,7 @@ impl Render for MainWindow {
             browse_open,
             editor_open,
             playback,
+            play_peaks,
         ) = {
             let shared = self.shared.lock().unwrap();
             let now = super::format::now_ms();
@@ -1267,6 +1268,7 @@ impl Render for MainWindow {
                 shared.browse_open,
                 shared.editor_open,
                 playback,
+                shared.play_peaks.clone(),
             )
         };
         // Tema global (todas as cores de `theme::` passam a ler a paleta ativa).
@@ -1375,6 +1377,7 @@ impl Render for MainWindow {
                 volume,
                 muted,
                 playback,
+                &play_peaks,
                 &lang,
                 cx,
             ))

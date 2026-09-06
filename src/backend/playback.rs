@@ -8,7 +8,7 @@ use libpulse_sys as pulse;
 
 use super::audio_graph;
 use super::decode::decode;
-use crate::core::state::Shared;
+use crate::core::state::{Shared, WAVEFORM_BARS};
 
 pub struct Engine {
     inner: Arc<Mutex<EngineInner>>,
@@ -94,6 +94,7 @@ impl Engine {
                     s.play_offset_secs = 0.0;
                     s.play_start_ms = now_ms();
                     s.seek_request = None;
+                    s.play_peaks = decoded.peaks(WAVEFORM_BARS);
                     s.bump();
                 });
 
@@ -168,6 +169,7 @@ impl Engine {
                     s.play_duration_secs = None;
                     s.play_offset_secs = 0.0;
                     s.seek_request = None;
+                    s.play_peaks.clear();
                     s.bump();
                 });
             })

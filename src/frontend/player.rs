@@ -5,9 +5,14 @@ use super::icons::icon;
 use super::main_window::MainWindow;
 use super::theme;
 use crate::core::i18n::t;
+use crate::core::state::WAVEFORM_BARS;
 
 /// Largura útil da barra de progresso (player de 680px menos `px_5` dos lados).
 const PROGRESS_W: f32 = 640.0;
+/// Largura de cada barra da forma de onda (128 × 5px = 640px, sem vãos).
+const BAR_W: f32 = PROGRESS_W / WAVEFORM_BARS as f32;
+/// Altura da área da forma de onda; a barra vai de 3px ao teto.
+const WAVE_H: f32 = 30.0;
 
 impl MainWindow {
     pub(crate) fn bottom_stack(
@@ -17,6 +22,7 @@ impl MainWindow {
         volume: f32,
         muted: bool,
         playback: Option<(f32, f32)>,
+        peaks: &[f32],
         lang: &str,
         cx: &mut Context<Self>,
     ) -> impl IntoElement {
@@ -28,7 +34,7 @@ impl MainWindow {
             .flex()
             .flex_col()
             .items_center()
-            .child(self.player_bar(playing, playing_label, volume, muted, playback, lang, cx))
+            .child(self.player_bar(playing, playing_label, volume, muted, playback, peaks, lang, cx))
             .child(
                 div()
                     .absolute()
@@ -81,6 +87,7 @@ impl MainWindow {
         volume: f32,
         muted: bool,
         playback: Option<(f32, f32)>,
+        peaks: &[f32],
         lang: &str,
         cx: &mut Context<Self>,
     ) -> impl IntoElement {
@@ -122,7 +129,7 @@ impl MainWindow {
             .border_1()
             .border_color(theme::border())
             .rounded(px(14.0))
-            .child(self.progress_section(playback, cx))
+            .child(self.progress_section(playback, peaks, cx))
             .child(
                 div()
                     .flex()
@@ -239,29 +246,48 @@ impl MainWindow {
             )
     }
 
-    /// Barra de progresso interativa: clique/arrasto faz seek.
-    /// Sem playback mostra `0:00 / 0:00` desabilitada.
+    /// Forma de onda clicável: 128 barras com a altura do pico de cada
+    /// trecho (estática por play — só a cor muda com o progresso).
+    /// Trechos já tocados em destaque, resto apagado; clique/arrasto faz
+    /// seek. Sem playback mostra `0:00 / 0:00` com barras chapadas.
     fn progress_section(
         &self,
         playback: Option<(f32, f32)>,
+        peaks: &[f32],
         cx: &mut Context<Self>,
     ) -> impl IntoElement {
         let (elapsed, duration, frac, enabled) = match playback {
             Some((e, d)) if d > 0.0 => (e, d, progress_fraction(e, d), true),
             _ => (0.0, 0.0, 0.0, false),
         };
-        let fill_w = PROGRESS_W * frac;
-        let rest_w = PROGRESS_W - fill_w;
-        let fill_color = if enabled {
-            theme::accent()
-        } else {
-            theme::border()
-        };
-        let knob_color = if enabled {
-            theme::accent()
-        } else {
-            theme::border()
-        };
+        let bars: Vec<open_gpui::AnyElement> = (0..WAVEFORM_BARS)
+            .map(|i| {
+                // Pico do trecho ou base chapada quando parado.
+                let peak = if enabled && peaks.len() == WAVEFORM_BARS {
+                    peaks[i].clamp(0.0, 1.0)
+                } else {
+                    0.06
+                };
+                let h = 3.0 + peak * (WAVE_H - 3.0);
+                let played = enabled && (i as f32 + 0.5) / WAVEFORM_BARS as f32 <= frac;
+                let color = if played {
+                    theme::accent()
+                } else {
+                    theme::border()
+                };
+                // Retas no meio: só a primeira arredonda à esquerda e a
+                // última à direita (bloco único, sem vãos).
+                let bar = div().w(px(BAR_W)).h(px(h)).bg(color);
+                let bar = if i == 0 {
+                    bar.rounded_l(px(2.0))
+                } else if i == WAVEFORM_BARS - 1 {
+                    bar.rounded_r(px(2.0))
+                } else {
+                    bar
+                };
+                bar.into_any_element()
+            })
+            .collect();
         let track = self.progress_track.clone();
 
         let slider = div()
@@ -275,10 +301,10 @@ impl MainWindow {
                 ),
             )
             .w(px(PROGRESS_W))
-            .h(px(20.0))
+            .h(px(WAVE_H))
             .flex()
-            .items_center()
-            .rounded(px(999.0));
+            .flex_row()
+            .items_center();
         // Só clicável com áudio: sem duração o cursor vira padrão.
         let slider = if enabled {
             slider.cursor_pointer()
@@ -293,22 +319,7 @@ impl MainWindow {
             .child(
                 open_gpui::measured_element(
                     "progress-track",
-                    slider
-                        .child(
-                            div()
-                                .w(px(fill_w))
-                                .h(px(4.0))
-                                .bg(fill_color)
-                                .rounded(px(999.0)),
-                        )
-                        .child(div().size(px(12.0)).bg(knob_color).rounded(px(999.0)))
-                        .child(
-                            div()
-                                .w(px(rest_w))
-                                .h(px(4.0))
-                                .bg(theme::border())
-                                .rounded(px(999.0)),
-                        ),
+                    slider.children(bars),
                     move |_id, bounds, _gid, _window, _cx| {
                         *track.lock().unwrap() = Some(bounds);
                     },

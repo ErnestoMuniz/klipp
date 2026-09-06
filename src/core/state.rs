@@ -27,6 +27,11 @@ pub struct OnlineSound {
     pub mp3: String,
 }
 
+/// Barras da forma de onda do player: envelope estático (pico 0–1 por
+/// trecho), calculado uma vez por play. Fixo para a trilha clicável
+/// de 640px caber exata (128 × 5px).
+pub const WAVEFORM_BARS: usize = 128;
+
 /// Estado compartilhado entre backend (threads/services) e frontend (GPUI).
 /// `version` funciona como geração: incremente sempre que a UI precisar re-renderizar.
 pub struct Shared {
@@ -138,10 +143,12 @@ pub struct Shared {
     /// Progresso do playback (barra do player): duração total, offset de
     /// seek e instante de início. `elapsed = offset + (now - start)/1000`.
     /// `seek_request` é consumido pela thread de playback (pulo imediato).
+    /// `play_peaks` é a forma de onda (ver `WAVEFORM_BARS`).
     pub play_duration_secs: Option<f32>,
     pub play_offset_secs: f32,
     pub play_start_ms: u128,
     pub seek_request: Option<f32>,
+    pub play_peaks: Vec<f32>,
     pub version: u64,
 }
 
@@ -223,6 +230,7 @@ impl Shared {
             play_offset_secs: 0.0,
             play_start_ms: 0,
             seek_request: None,
+            play_peaks: vec![],
             version: 1,
         }
     }

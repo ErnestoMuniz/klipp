@@ -14,6 +14,39 @@ impl Decoded {
         }
         self.samples.len() as f32 / self.channels as f32 / self.rate as f32
     }
+
+    /// Envelope estático para a forma de onda do player: pico (0–1) por
+    /// balde, normalizado pelo pico global. Uma passada sobre as amostras,
+    /// calculado uma vez por play — a UI só pinta, sem reamostrar nem
+    /// mudar de forma com o áudio.
+    pub fn peaks(&self, buckets: usize) -> Vec<f32> {
+        if buckets == 0 {
+            return vec![];
+        }
+        let channels = self.channels.max(1);
+        let frames = self.samples.len() / channels;
+        if frames == 0 {
+            return vec![0.0; buckets];
+        }
+        let mut out = vec![0.0f32; buckets];
+        for (i, frame) in self.samples.chunks_exact(channels).enumerate() {
+            let mut v = 0.0f32;
+            for s in frame {
+                v = v.max(s.abs());
+            }
+            let b = (i * buckets / frames).min(buckets - 1);
+            out[b] = out[b].max(v);
+        }
+        let max = out.iter().cloned().fold(0.0f32, f32::max);
+        if max <= 0.0 {
+            // Silêncio total: base mínima para não sumir.
+            return vec![0.06; buckets];
+        }
+        for v in out.iter_mut() {
+            *v = (*v / max).max(0.06);
+        }
+        out
+    }
 }
 
 /// Decodifica o arquivo inteiro para f32 interleaved usando symphonia.
@@ -78,4 +111,38 @@ pub fn decode(path: &Path) -> anyhow::Result<Decoded> {
         channels,
         samples,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::Decoded;
+
+    fn decoded(samples: Vec<f32>, channels: usize) -> Decoded {
+        Decoded {
+            rate: 44100,
+            channels,
+            samples,
+        }
+    }
+
+    #[test]
+    fn picos_mapeiam_trechos_alto_e_baixo() {
+        // Mono: metade silenciosa, metade no pico.
+        let d = decoded(vec![0.0, 0.0, 1.0, 0.5], 1);
+        assert_eq!(d.peaks(2), vec![0.06, 1.0]);
+    }
+
+    #[test]
+    fn silencio_total_vira_base_minima() {
+        let d = decoded(vec![0.0; 8], 2);
+        assert_eq!(d.peaks(4), vec![0.06; 4]);
+    }
+
+    #[test]
+    fn sem_balde_ou_sem_frame_nao_quebra() {
+        let d = decoded(vec![0.5, 0.5], 1);
+        assert!(d.peaks(0).is_empty());
+        let empty = decoded(vec![], 2);
+        assert_eq!(empty.peaks(3), vec![0.0; 3]);
+    }
 }
