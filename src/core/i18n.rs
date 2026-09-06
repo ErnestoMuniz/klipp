@@ -102,6 +102,19 @@ fn en(key: &str) -> &'static str {
         "browse.searching" => "Searching…",
         "browse.no_results" => "No sounds found for “{query}”.",
         "browse.downloading" => "Downloading…",
+        "pick.title" => "Add sounds",
+        "shortcut.portal_desc" => "Open the sound picker",
+        "err.pick" => "File picker: {msg}",
+        "err.pick_portal" => {
+            "File picker unavailable: portal requires app-id — run via Flatpak or scripts/dev-run.sh"
+        }
+        "err.sink" => "Failed to connect to sink: {msg}",
+        "err.shortcut" => "Shortcut: {msg}",
+        "err.shortcut_portal" => {
+            "Global shortcut unavailable: portal requires app-id — run via Flatpak or scripts/dev-run.sh"
+        }
+        "err.import_none" => "No valid audio files to import",
+        "err.mic" => "Microphone: {msg}",
         _ => "",
     }
 }
@@ -177,6 +190,56 @@ fn pt(key: &str) -> &'static str {
         "browse.searching" => "Buscando…",
         "browse.no_results" => "Nenhum áudio para “{query}”.",
         "browse.downloading" => "Baixando…",
+        "pick.title" => "Adicionar áudios",
+        "shortcut.portal_desc" => "Abrir o seletor de sons",
+        "err.pick" => "Seletor de arquivos: {msg}",
+        "err.pick_portal" => {
+            "Seletor indisponível: o portal exige app-id — rode via Flatpak ou scripts/dev-run.sh"
+        }
+        "err.sink" => "Falha ao conectar no sink: {msg}",
+        "err.shortcut" => "Atalho: {msg}",
+        "err.shortcut_portal" => {
+            "Atalho global indisponível: o portal exige app-id — rode via Flatpak ou scripts/dev-run.sh"
+        }
+        "err.import_none" => "Nenhum arquivo de áudio válido para importar",
+        "err.mic" => "Microfone: {msg}",
         _ => "",
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    /// Catálogo espelhado: toda chave existe nos dois idiomas.
+    /// (`resolve` cai para EN quando a chave falta — sem esse teste a
+    /// falta passa silenciosa.)
+    #[test]
+    fn catalogo_en_e_pt_tem_as_mesmas_chaves() {
+        // Chaves conhecidas dos dois lados (amostra das novas chaves de erro).
+        for key in [
+            "pick.title",
+            "shortcut.portal_desc",
+            "err.pick",
+            "err.pick_portal",
+            "err.sink",
+            "err.shortcut",
+            "err.shortcut_portal",
+            "err.import_none",
+            "err.mic",
+            "browse.downloading",
+            "player.ready",
+        ] {
+            assert_ne!(super::t("en", key), "", "falta em en: {key}");
+            assert_ne!(super::t("pt-BR", key), "", "falta em pt-BR: {key}");
+        }
+        // Placeholders preservados na tradução.
+        let msg = "x";
+        for key in ["err.pick", "err.sink", "err.shortcut", "err.mic"] {
+            for lang in ["en", "pt-BR"] {
+                assert!(
+                    super::t_fmt(lang, key, &[("msg", msg)]).contains(msg),
+                    "{key} perdeu {{msg}} em {lang}"
+                );
+            }
+        }
     }
 }

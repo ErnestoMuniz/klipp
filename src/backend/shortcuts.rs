@@ -4,6 +4,7 @@ use ashpd::desktop::global_shortcuts::GlobalShortcuts;
 use ashpd::desktop::Session;
 use futures_util::lock::Mutex as AsyncMutex;
 
+use crate::core::i18n::{t, t_fmt};
 use crate::core::state::Shared;
 
 pub const OVERLAY_ID: &str = "klipp-overlay";
@@ -65,11 +66,13 @@ fn spec_trigger(preferred: &str) -> String {
 async fn bind(
     svc: &Arc<AsyncMutex<Service>>,
     preferred: &str,
+    lang: &str,
 ) -> anyhow::Result<Option<String>> {
     use ashpd::desktop::global_shortcuts::{BindShortcutsOptions, NewShortcut};
     let trigger = spec_trigger(preferred);
+    let desc = t(lang, "shortcut.portal_desc");
     let new_shortcut =
-        NewShortcut::new(OVERLAY_ID, "Abrir o seletor de sons").preferred_trigger(Some(trigger.as_str()));
+        NewShortcut::new(OVERLAY_ID, desc.as_str()).preferred_trigger(Some(trigger.as_str()));
     // Lock async: as streams do loop são owned, não dependem dele.
     let svc = svc.lock().await;
     let request = svc
@@ -95,13 +98,15 @@ pub async fn run(shared: Arc<std::sync::Mutex<Shared>>, preferred: String) -> an
         Ok(svc) => svc,
         Err(err) => {
             set_shared(&shared, |s| {
-                s.last_error = Some(friendly_portal_error(&err));
+                let lang = s.lang.clone();
+                s.last_error = Some(friendly_portal_error(&lang, &err));
                 s.bump();
             });
             return Ok(());
         }
     };
-    match bind(&svc, &preferred).await {
+    let lang = shared.lock().unwrap().lang.clone();
+    match bind(&svc, &preferred, &lang).await {
         Ok(Some(trigger)) => {
             log::info!("atalho global vinculado: '{trigger}' (preferido '{preferred}')");
             // Portal pode retornar trigger vazio (ex. Hyprland) ou só após
@@ -121,7 +126,8 @@ pub async fn run(shared: Arc<std::sync::Mutex<Shared>>, preferred: String) -> an
         }
         Err(err) => {
             set_shared(&shared, |s| {
-                s.last_error = Some(friendly_portal_error(&err));
+                let lang = s.lang.clone();
+                s.last_error = Some(friendly_portal_error(&lang, &err));
                 s.bump();
             });
             return Ok(());
@@ -246,8 +252,11 @@ pub async fn rebind(shared: Arc<std::sync::Mutex<Shared>>) -> anyhow::Result<()>
             // Portal antigo sem ConfigureShortcuts: cai para bind (mostra o
             // diálogo de primeira vinculação).
             Err(_) => {
-                let preferred = shared.lock().unwrap().shortcut.clone();
-                bind(&svc, &preferred).await
+                let (preferred, lang) = {
+                    let s = shared.lock().unwrap();
+                    (s.shortcut.clone(), s.lang.clone())
+                };
+                bind(&svc, &preferred, &lang).await
             }
         }
     }
@@ -267,7 +276,8 @@ pub async fn rebind(shared: Arc<std::sync::Mutex<Shared>>) -> anyhow::Result<()>
             let msg = err.to_string();
             // Usuário fechou o diálogo sem escolher: não é erro.
             if !msg.contains("Cancelled") && !msg.contains("cancelled") {
-                s.last_error = Some(friendly_portal_error(&err));
+                let lang = s.lang.clone();
+                s.last_error = Some(friendly_portal_error(&lang, &err));
             }
         }
     }
@@ -283,12 +293,12 @@ fn set_shared(shared: &Arc<std::sync::Mutex<Shared>>, f: impl FnOnce(&mut Shared
 }
 
 /// Explica o erro mais comum fora do Flatpak (portal exige app-id).
-fn friendly_portal_error(err: &anyhow::Error) -> String {
+fn friendly_portal_error(lang: &str, err: &anyhow::Error) -> String {
     let msg = err.to_string();
     if msg.contains("An app id is required") {
-        "atalho global indisponível: o portal exige app-id — rode via Flatpak ou scripts/dev-run.sh".into()
+        t(lang, "err.shortcut_portal")
     } else {
-        format!("atalho: {msg}")
+        t_fmt(lang, "err.shortcut", &[("msg", &msg)])
     }
 }
 

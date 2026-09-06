@@ -8,6 +8,7 @@ use libpulse_sys as pulse;
 
 use super::audio_graph;
 use super::decode::decode;
+use crate::core::i18n::t_fmt;
 use crate::core::state::{Shared, WAVEFORM_BARS};
 
 pub struct Engine {
@@ -158,7 +159,10 @@ impl Engine {
                     Err(err) => {
                         log::error!("não foi possível conectar ao sink: {err}");
                         set_shared(&shared, |s| {
-                            s.last_error = Some(format!("falha ao conectar no sink: {err}"));
+                            let lang = s.lang.clone();
+                            let msg = err.to_string();
+                            s.last_error =
+                                Some(t_fmt(&lang, "err.sink", &[("msg", &msg)]));
                             s.bump();
                         });
                     }

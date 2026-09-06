@@ -2,6 +2,7 @@ use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
 use crate::backend::sounds;
+use crate::core::i18n::{t, t_fmt};
 use crate::core::state::Shared;
 
 /// Abre o seletor de arquivos do portal, copia os escolhidos para a
@@ -17,8 +18,10 @@ pub async fn pick_and_import(shared: Arc<Mutex<Shared>>) -> anyhow::Result<()> {
         .glob("*.m4a")
         .glob("*.opus")
         .glob("*.aac");
+    let lang = shared.lock().unwrap().lang.clone();
+    let title = t(&lang, "pick.title");
     let req = match OpenFileRequest::default()
-        .title("Add sounds")
+        .title(title.as_str())
         .multiple(true)
         .filter(filter)
         .send()
@@ -30,11 +33,11 @@ pub async fn pick_and_import(shared: Arc<Mutex<Shared>>) -> anyhow::Result<()> {
         Err(e) => {
             let msg = e.to_string();
             let mut s = shared.lock().unwrap();
+            let lang = s.lang.clone();
             s.last_error = Some(if msg.contains("An app id is required") {
-                "seletor indisponível: o portal exige app-id — rode via Flatpak ou scripts/dev-run.sh"
-                    .into()
+                t(&lang, "err.pick_portal")
             } else {
-                format!("seletor de arquivos: {msg}")
+                t_fmt(&lang, "err.pick", &[("msg", &msg)])
             });
             s.bump();
             return Ok(());

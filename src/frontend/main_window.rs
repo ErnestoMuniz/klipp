@@ -17,6 +17,7 @@ use super::titlebar::titlebar;
 use super::ui::{hint_banner, status_banner};
 use crate::backend::{self, AudioGraph, Engine};
 use crate::core::state::{Shared, Sound};
+use crate::core::i18n::{t, t_fmt};
 
 /// Campo de texto customizado (inputs desenhados à mão, sem seleção nativa).
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -1043,7 +1044,11 @@ impl MainWindow {
                 s.mic_source = name;
                 s.mic = format!("ok · mic virtual ← {}", s.mic_source.clone());
             }
-            Err(err) => s.last_error = Some(format!("microfone: {err}")),
+            Err(err) => {
+                let lang = s.lang.clone();
+                let msg = err.to_string();
+                s.last_error = Some(t_fmt(&lang, "err.mic", &[("msg", &msg)]));
+            }
         }
         s.mic_open = false;
         s.bump();
@@ -1134,7 +1139,7 @@ impl MainWindow {
         let n = backend::import_paths(paths);
         let mut s = self.shared.lock().unwrap();
         if n == 0 {
-            s.last_error = Some("nenhum arquivo de áudio válido para importar".into());
+            s.last_error = Some(t(&s.lang.clone(), "err.import_none"));
             s.bump();
         } else {
             log::info!("{n} sons importados via arrastar-e-soltar");

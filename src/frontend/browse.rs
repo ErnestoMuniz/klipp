@@ -759,6 +759,14 @@ fn browse_results(
                             .truncate()
                             .child(item.title.clone()),
                     )
+                    .children(is_downloading.then(|| {
+                        div()
+                            .text_xs()
+                            .text_color(theme::muted())
+                            .flex_shrink_0()
+                            .child(t(lang, "browse.downloading"))
+                            .into_any_element()
+                    }))
                     .child(action)
             }))
             .into_any_element()
