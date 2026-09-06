@@ -47,3 +47,39 @@ pub(crate) fn format_duration(secs: Option<f32>) -> String {
         }
     }
 }
+
+/// Relógio do player (`0:00`, `1:05`): minutos sem zero à esquerda.
+pub(crate) fn format_clock(secs: f32) -> String {
+    let total = secs.max(0.0).floor() as u32;
+    format!("{}:{:02}", total / 60, total % 60)
+}
+
+/// Fração 0–1 do progresso, segura contra duração zerada/negativa.
+pub(crate) fn progress_fraction(elapsed_secs: f32, duration_secs: f32) -> f32 {
+    if duration_secs <= 0.0 {
+        return 0.0;
+    }
+    (elapsed_secs / duration_secs).clamp(0.0, 1.0)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{format_clock, progress_fraction};
+
+    #[test]
+    fn clock_formata_minutos_e_segundos() {
+        assert_eq!(format_clock(0.0), "0:00");
+        assert_eq!(format_clock(3.9), "0:03");
+        assert_eq!(format_clock(65.0), "1:05");
+        assert_eq!(format_clock(-5.0), "0:00");
+    }
+
+    #[test]
+    fn fracao_prende_nas_pontas_e_rejeita_duracao_invalida() {
+        assert_eq!(progress_fraction(5.0, 10.0), 0.5);
+        assert_eq!(progress_fraction(15.0, 10.0), 1.0);
+        assert_eq!(progress_fraction(-2.0, 10.0), 0.0);
+        assert_eq!(progress_fraction(5.0, 0.0), 0.0);
+        assert_eq!(progress_fraction(5.0, -1.0), 0.0);
+    }
+}

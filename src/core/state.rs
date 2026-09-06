@@ -135,6 +135,13 @@ pub struct Shared {
     /// Quando o play do preview começou: o tick só limpa `browse_previewing`
     /// 1s depois (cobre o vão entre `loading=false` e `playing=Some`).
     pub browse_preview_started_ms: u128,
+    /// Progresso do playback (barra do player): duração total, offset de
+    /// seek e instante de início. `elapsed = offset + (now - start)/1000`.
+    /// `seek_request` é consumido pela thread de playback (pulo imediato).
+    pub play_duration_secs: Option<f32>,
+    pub play_offset_secs: f32,
+    pub play_start_ms: u128,
+    pub seek_request: Option<f32>,
     pub version: u64,
 }
 
@@ -212,6 +219,10 @@ impl Shared {
             browse_previewing: None,
             browse_preview_loading: false,
             browse_preview_started_ms: 0,
+            play_duration_secs: None,
+            play_offset_secs: 0.0,
+            play_start_ms: 0,
+            seek_request: None,
             version: 1,
         }
     }
@@ -228,6 +239,23 @@ impl Shared {
             .filter(|s| !self.unfavorited.contains(&s.name))
             .cloned()
             .collect()
+    }
+
+    /// Posição atual do playback (elapsed, duration) em segundos.
+    /// `None` quando parado ou sem duração conhecida.
+    pub fn playback_pos(&self, now_ms: u128) -> Option<(f32, f32)> {
+        let duration = self.play_duration_secs.filter(|d| *d > 0.0)?;
+        if self.playing.is_none() {
+            return None;
+        }
+        let elapsed = if self.seek_request.is_some() {
+            // Seek pendente: mostra o alvo de imediato (sem esperar a thread).
+            self.seek_request.unwrap_or(self.play_offset_secs)
+        } else {
+            let wall = now_ms.saturating_sub(self.play_start_ms) as f32 / 1000.0;
+            self.play_offset_secs + wall
+        };
+        Some((elapsed.clamp(0.0, duration), duration))
     }
 }
 
@@ -259,5 +287,38 @@ mod tests {
             .map(|x| x.name.clone())
             .collect();
         assert_eq!(fav, vec!["a".to_string(), "c".to_string()]);
+    }
+
+    #[test]
+    fn playback_pos_sem_play_ou_duracao_e_none() {
+        let mut s = Shared::new(&Settings::default());
+        assert_eq!(s.playback_pos(1000), None);
+        s.playing = Some("a".into());
+        assert_eq!(s.playback_pos(1000), None);
+        s.play_duration_secs = Some(0.0);
+        assert_eq!(s.playback_pos(1000), None);
+    }
+
+    #[test]
+    fn playback_pos_avanca_com_wall_clock_e_prende_no_total() {
+        let mut s = Shared::new(&Settings::default());
+        s.playing = Some("a".into());
+        s.play_duration_secs = Some(10.0);
+        s.play_offset_secs = 2.0;
+        s.play_start_ms = 1000;
+        assert_eq!(s.playback_pos(3000), Some((4.0, 10.0)));
+        // Passou do fim: prende em 10.
+        assert_eq!(s.playback_pos(20000), Some((10.0, 10.0)));
+    }
+
+    #[test]
+    fn playback_pos_mostra_alvo_do_seek_pendente() {
+        let mut s = Shared::new(&Settings::default());
+        s.playing = Some("a".into());
+        s.play_duration_secs = Some(10.0);
+        s.play_offset_secs = 1.0;
+        s.play_start_ms = 1000;
+        s.seek_request = Some(8.0);
+        assert_eq!(s.playback_pos(1500), Some((8.0, 10.0)));
     }
 }

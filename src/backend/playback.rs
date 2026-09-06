@@ -90,10 +90,16 @@ impl Engine {
 
                 set_shared(&shared, |s| {
                     s.playing = Some(name.clone());
+                    s.play_duration_secs = Some(decoded.duration_secs());
+                    s.play_offset_secs = 0.0;
+                    s.play_start_ms = now_ms();
+                    s.seek_request = None;
                     s.bump();
                 });
 
                 let frames = to_stereo(&decoded.samples);
+                let duration = decoded.duration_secs().max(0.001);
+                let rate = decoded.rate.max(1) as f32;
                 log::info!("conectando ao sink {}", audio_graph::CLIPS_SINK);
                 match PulseWriter::new(
                     "klipp",
@@ -105,10 +111,27 @@ impl Engine {
                         log::info!("tocando...");
                         // Frames f32 interleaved -> bytes LE (FLOAT32LE é little-endian).
                         // Ganho lido por chunk para o slider de volume valer no meio do play.
-                        for chunk in frames.chunks(512) {
+                        // Seek: `seek_request` reposiciona o índice (amostras já
+                        // decodificadas em memória, pulo imediato sem re-decode).
+                        let mut idx = 0usize;
+                        while idx < frames.len() {
                             if stop_task.load(Ordering::SeqCst) {
                                 break;
                             }
+                            let seek_to: Option<f32> =
+                                shared.lock().map(|mut s| s.seek_request.take()).unwrap_or(None);
+                            if let Some(target) = seek_to {
+                                let clamped = target.clamp(0.0, duration);
+                                idx = ((clamped * rate) as usize).min(frames.len());
+                                set_shared(&shared, |s| {
+                                    s.play_offset_secs = clamped;
+                                    s.play_start_ms = now_ms();
+                                    s.bump();
+                                });
+                                continue;
+                            }
+                            let end = (idx + 512).min(frames.len());
+                            let chunk = &frames[idx..end];
                             let vol = shared
                                 .lock()
                                 .map(|s| {
@@ -128,6 +151,7 @@ impl Engine {
                                 log::warn!("escrita no sink falhou: {err}");
                                 break;
                             }
+                            idx = end;
                         }
                     }
                     Err(err) => {
@@ -141,6 +165,9 @@ impl Engine {
 
                 set_shared(&shared, |s| {
                     s.playing = None;
+                    s.play_duration_secs = None;
+                    s.play_offset_secs = 0.0;
+                    s.seek_request = None;
                     s.bump();
                 });
             })
@@ -153,6 +180,14 @@ fn set_shared(shared: &Arc<Mutex<Shared>>, f: impl FnOnce(&mut Shared)) {
     if let Ok(mut s) = shared.lock() {
         f(&mut s);
     }
+}
+
+fn now_ms() -> u128 {
+    use std::time::{SystemTime, UNIX_EPOCH};
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.as_millis())
+        .unwrap_or(0)
 }
 
 fn to_stereo(samples: &[f32]) -> Vec<[f32; 2]> {

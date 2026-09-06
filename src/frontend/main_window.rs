@@ -57,6 +57,10 @@ pub struct MainWindow {
     /// Retângulo da trilha do slider (medido a cada frame): permite mapear
     /// o clique em px de janela para fração 0–1 (pulo imediato).
     pub(crate) vol_track: Arc<Mutex<Option<open_gpui::Bounds<open_gpui::Pixels>>>>,
+    /// Arrastar na barra de progresso: mesmo padrão do volume.
+    progress_dragging: bool,
+    /// Retângulo da trilha de progresso (medido a cada frame).
+    pub(crate) progress_track: Arc<Mutex<Option<open_gpui::Bounds<open_gpui::Pixels>>>>,
     /// Arrastar para selecionar texto nos inputs: (campo, x inicial em px).
     /// Seleção dos inputs custom é tudo-ou-nada (sem cursor): arrasto além
     /// de 4px ou duplo-clique seleciona o texto todo.
@@ -89,6 +93,8 @@ impl MainWindow {
             hovered_card: None,
             vol_dragging: false,
             vol_track: Arc::new(Mutex::new(None)),
+            progress_dragging: false,
+            progress_track: Arc::new(Mutex::new(None)),
             text_drag: None,
             last_ver: 1,
             last_overlay_active: false,
@@ -867,6 +873,67 @@ impl MainWindow {
         }
     }
 
+    /// Seek absoluto em segundos: a thread de playback consome via
+    /// `seek_request`; o offset é atualizado na hora para a UI responder
+    /// sem esperar o próximo chunk de áudio.
+    pub(crate) fn seek_to(&self, secs: f32, cx: &mut Context<Self>) {
+        let mut s = self.shared.lock().unwrap();
+        let Some(duration) = s.play_duration_secs.filter(|d| *d > 0.0) else {
+            return;
+        };
+        if s.playing.is_none() {
+            return;
+        }
+        let clamped = secs.clamp(0.0, duration);
+        s.seek_request = Some(clamped);
+        // Feedback otimista: a UI mostra o alvo já neste frame.
+        s.play_offset_secs = clamped;
+        s.play_start_ms = super::format::now_ms();
+        s.bump();
+        cx.notify();
+    }
+
+    /// Fração 0–1 do clique na trilha de progresso.
+    pub(crate) fn progress_fraction_at(&self, x: f32) -> Option<f32> {
+        let bounds = self.progress_track.lock().unwrap().clone()?;
+        vol_fraction_in(bounds, x)
+    }
+
+    pub(crate) fn on_progress_down(&mut self, x: f32, cx: &mut Context<Self>) {
+        if let Some(fraction) = self.progress_fraction_at(x) {
+            let duration = self
+                .shared
+                .lock()
+                .unwrap()
+                .play_duration_secs
+                .filter(|d| *d > 0.0);
+            if let Some(d) = duration {
+                self.seek_to(fraction * d, cx);
+            }
+        }
+        self.progress_dragging = true;
+    }
+
+    pub(crate) fn on_progress_move(&mut self, x: f32, cx: &mut Context<Self>) {
+        if self.progress_dragging {
+            if let Some(fraction) = self.progress_fraction_at(x) {
+                let duration = self
+                    .shared
+                    .lock()
+                    .unwrap()
+                    .play_duration_secs
+                    .filter(|d| *d > 0.0);
+                if let Some(d) = duration {
+                    self.seek_to(fraction * d, cx);
+                }
+            }
+        }
+    }
+
+    pub(crate) fn end_progress_drag(&mut self) {
+        self.progress_dragging = false;
+    }
+
     pub(crate) fn toggle_play(&self, cx: &mut Context<Self>) {
         let playing = self.shared.lock().unwrap().playing.clone();
         if playing.is_some() {
@@ -1172,8 +1239,11 @@ impl Render for MainWindow {
             about_open,
             browse_open,
             editor_open,
+            playback,
         ) = {
             let shared = self.shared.lock().unwrap();
+            let now = super::format::now_ms();
+            let playback = shared.playback_pos(now);
             (
                 shared.shortcut.clone(),
                 shared.last_error.clone(),
@@ -1196,6 +1266,7 @@ impl Render for MainWindow {
                 shared.about_open,
                 shared.browse_open,
                 shared.editor_open,
+                playback,
             )
         };
         // Tema global (todas as cores de `theme::` passam a ler a paleta ativa).
@@ -1256,6 +1327,7 @@ impl Render for MainWindow {
             .on_mouse_move(cx.listener(
                 |this, event: &open_gpui::MouseMoveEvent, _window, cx| {
                     this.on_vol_move(f32::from(event.position.x), cx);
+                    this.on_progress_move(f32::from(event.position.x), cx);
                 },
             ))
             .on_mouse_down(
@@ -1270,6 +1342,7 @@ impl Render for MainWindow {
                 MouseButton::Left,
                 cx.listener(|this, _event, _window, _cx| {
                     this.end_vol_drag();
+                    this.end_progress_drag();
                 }),
             )
             .on_drop(cx.listener(
@@ -1301,6 +1374,7 @@ impl Render for MainWindow {
                 playing_label.as_deref(),
                 volume,
                 muted,
+                playback,
                 &lang,
                 cx,
             ))

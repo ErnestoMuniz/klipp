@@ -1,10 +1,13 @@
 use open_gpui::{Context, IntoElement, MouseButton, div, prelude::*, px};
 
-use super::format::{now_ms, rgb_dark};
+use super::format::{format_clock, now_ms, progress_fraction, rgb_dark};
 use super::icons::icon;
 use super::main_window::MainWindow;
 use super::theme;
 use crate::core::i18n::t;
+
+/// Largura útil da barra de progresso (player de 680px menos `px_5` dos lados).
+const PROGRESS_W: f32 = 640.0;
 
 impl MainWindow {
     pub(crate) fn bottom_stack(
@@ -13,6 +16,7 @@ impl MainWindow {
         playing_label: Option<&str>,
         volume: f32,
         muted: bool,
+        playback: Option<(f32, f32)>,
         lang: &str,
         cx: &mut Context<Self>,
     ) -> impl IntoElement {
@@ -24,7 +28,7 @@ impl MainWindow {
             .flex()
             .flex_col()
             .items_center()
-            .child(self.player_bar(playing, playing_label, volume, muted, lang, cx))
+            .child(self.player_bar(playing, playing_label, volume, muted, playback, lang, cx))
             .child(
                 div()
                     .absolute()
@@ -76,6 +80,7 @@ impl MainWindow {
         playing_label: Option<&str>,
         volume: f32,
         muted: bool,
+        playback: Option<(f32, f32)>,
         lang: &str,
         cx: &mut Context<Self>,
     ) -> impl IntoElement {
@@ -111,119 +116,213 @@ impl MainWindow {
             .px_5()
             .py_3()
             .flex()
-            .items_center()
-            .justify_between()
+            .flex_col()
+            .gap_2()
             .bg(theme::panel())
             .border_1()
             .border_color(theme::border())
             .rounded(px(14.0))
+            .child(self.progress_section(playback, cx))
             .child(
                 div()
                     .flex()
                     .items_center()
-                    .gap_4()
-                    .child(
-                        div()
-                            .id("player-toggle")
-                            .on_click(cx.listener(|this, _e, _w, cx| this.toggle_play(cx)),
-                            )
-                            .p_1()
-                            .rounded(px(8.0))
-                            .cursor_pointer()
-                            .hover(|s| s.bg(theme::card_hover()))
-                            .text_color(theme::muted())
-                            .child(icon(toggle_icon, 20.0, theme::muted())),
-                    )
-                    .child(eq_bars(playing.is_some()))
+                    .justify_between()
                     .child(
                         div()
                             .flex()
-                            .flex_col()
-                            .gap_1()
-                            .w(px(180.0))
+                            .items_center()
+                            .gap_4()
                             .child(
                                 div()
-                                    .text_xs()
+                                    .id("player-toggle")
+                                    .on_click(cx.listener(|this, _e, _w, cx| this.toggle_play(cx)),
+                                    )
+                                    .p_1()
+                                    .rounded(px(8.0))
+                                    .cursor_pointer()
+                                    .hover(|s| s.bg(theme::card_hover()))
                                     .text_color(theme::muted())
-                                    .child(state_label),
+                                    .child(icon(toggle_icon, 20.0, theme::muted())),
                             )
-                            .child(div().text_sm().truncate().child(track_label)),
+                            .child(eq_bars(playing.is_some()))
+                            .child(
+                                div()
+                                    .flex()
+                                    .flex_col()
+                                    .gap_1()
+                                    .w(px(180.0))
+                                    .child(
+                                        div()
+                                            .text_xs()
+                                            .text_color(theme::muted())
+                                            .child(state_label),
+                                    )
+                                    .child(div().text_sm().truncate().child(track_label)),
+                            ),
+                    )
+                    .child(
+                        div()
+                            .flex()
+                            .items_center()
+                            .gap_4()
+                            .child(div().w(px(1.0)).h(px(32.0)).bg(theme::border()))
+                            .child(
+                                div()
+                                    .id("vol-mute")
+                                    .on_click(cx.listener(|this, _e, _w, cx| {
+                                        cx.stop_propagation();
+                                        this.toggle_mute(cx)
+                                    }))
+                                    .p_1()
+                                    .rounded(px(8.0))
+                                    .cursor_pointer()
+                                    .hover(|s| s.bg(theme::card_hover()))
+                                    .text_color(theme::muted())
+                                    .child(icon(vol_icon, 18.0, theme::muted())),
+                            )
+                            .child(
+                                open_gpui::measured_element(
+                                    "vol-track",
+                                    div()
+                                        .id("vol-slider")
+                                        .on_mouse_down(
+                                            MouseButton::Left,
+                                            cx.listener(
+                                                |this, event: &open_gpui::MouseDownEvent, _window, cx| {
+                                                    this.on_vol_down(
+                                                        f32::from(event.position.x),
+                                                        cx,
+                                                    );
+                                                },
+                                            ),
+                                        )
+                                        .w(px(212.0))
+                                        .h(px(20.0))
+                                        .flex()
+                                        .items_center()
+                                        .cursor_pointer()
+                                        .rounded(px(999.0))
+                                        .child(
+                                            div()
+                                                .w(px(fill_w))
+                                                .h(px(4.0))
+                                                .bg(theme::accent())
+                                                .rounded(px(999.0)),
+                                        )
+                                        .child(
+                                            div()
+                                                .size(px(12.0))
+                                                .bg(theme::accent())
+                                                .rounded(px(999.0)),
+                                        )
+                                        .child(
+                                            div()
+                                                .w(px(rest_w))
+                                                .h(px(4.0))
+                                                .bg(theme::border())
+                                                .rounded(px(999.0)),
+                                        ),
+                                    move |_id, bounds, _gid, _window, _cx| {
+                                        *track.lock().unwrap() = Some(bounds);
+                                    },
+                                ),
+                            )
+                            .child(
+                                div()
+                                    .w(px(44.0))
+                                    .text_sm()
+                                    .text_right()
+                                    .child(format!("{:.0}%", shown * 100.0)),
+                            ),
                     ),
+            )
+    }
+
+    /// Barra de progresso interativa: clique/arrasto faz seek.
+    /// Sem playback mostra `0:00 / 0:00` desabilitada.
+    fn progress_section(
+        &self,
+        playback: Option<(f32, f32)>,
+        cx: &mut Context<Self>,
+    ) -> impl IntoElement {
+        let (elapsed, duration, frac, enabled) = match playback {
+            Some((e, d)) if d > 0.0 => (e, d, progress_fraction(e, d), true),
+            _ => (0.0, 0.0, 0.0, false),
+        };
+        let fill_w = PROGRESS_W * frac;
+        let rest_w = PROGRESS_W - fill_w;
+        let fill_color = if enabled {
+            theme::accent()
+        } else {
+            theme::border()
+        };
+        let knob_color = if enabled {
+            theme::accent()
+        } else {
+            theme::border()
+        };
+        let track = self.progress_track.clone();
+
+        let slider = div()
+            .id("progress-slider")
+            .on_mouse_down(
+                MouseButton::Left,
+                cx.listener(
+                    |this, event: &open_gpui::MouseDownEvent, _window, cx| {
+                        this.on_progress_down(f32::from(event.position.x), cx);
+                    },
+                ),
+            )
+            .w(px(PROGRESS_W))
+            .h(px(20.0))
+            .flex()
+            .items_center()
+            .rounded(px(999.0));
+        // Só clicável com áudio: sem duração o cursor vira padrão.
+        let slider = if enabled {
+            slider.cursor_pointer()
+        } else {
+            slider
+        };
+
+        div()
+            .flex()
+            .flex_col()
+            .gap_1()
+            .child(
+                open_gpui::measured_element(
+                    "progress-track",
+                    slider
+                        .child(
+                            div()
+                                .w(px(fill_w))
+                                .h(px(4.0))
+                                .bg(fill_color)
+                                .rounded(px(999.0)),
+                        )
+                        .child(div().size(px(12.0)).bg(knob_color).rounded(px(999.0)))
+                        .child(
+                            div()
+                                .w(px(rest_w))
+                                .h(px(4.0))
+                                .bg(theme::border())
+                                .rounded(px(999.0)),
+                        ),
+                    move |_id, bounds, _gid, _window, _cx| {
+                        *track.lock().unwrap() = Some(bounds);
+                    },
+                ),
             )
             .child(
                 div()
                     .flex()
                     .items_center()
-                    .gap_4()
-                    .child(div().w(px(1.0)).h(px(32.0)).bg(theme::border()))
-                    .child(
-                        div()
-                            .id("vol-mute")
-                            .on_click(cx.listener(|this, _e, _w, cx| {
-                                cx.stop_propagation();
-                                this.toggle_mute(cx)
-                            }))
-                            .p_1()
-                            .rounded(px(8.0))
-                            .cursor_pointer()
-                            .hover(|s| s.bg(theme::card_hover()))
-                            .text_color(theme::muted())
-                            .child(icon(vol_icon, 18.0, theme::muted())),
-                    )
-                    .child(
-                        open_gpui::measured_element(
-                            "vol-track",
-                            div()
-                                .id("vol-slider")
-                                .on_mouse_down(
-                                    MouseButton::Left,
-                                    cx.listener(
-                                        |this, event: &open_gpui::MouseDownEvent, _window, cx| {
-                                            this.on_vol_down(
-                                                f32::from(event.position.x),
-                                                cx,
-                                            );
-                                        },
-                                    ),
-                                )
-                                .w(px(212.0))
-                                .h(px(20.0))
-                                .flex()
-                                .items_center()
-                                .cursor_pointer()
-                                .rounded(px(999.0))
-                                .child(
-                                    div()
-                                        .w(px(fill_w))
-                                        .h(px(4.0))
-                                        .bg(theme::accent())
-                                        .rounded(px(999.0)),
-                                )
-                                .child(
-                                    div()
-                                        .size(px(12.0))
-                                        .bg(theme::accent())
-                                        .rounded(px(999.0)),
-                                )
-                                .child(
-                                    div()
-                                        .w(px(rest_w))
-                                        .h(px(4.0))
-                                        .bg(theme::border())
-                                        .rounded(px(999.0)),
-                                ),
-                            move |_id, bounds, _gid, _window, _cx| {
-                                *track.lock().unwrap() = Some(bounds);
-                            },
-                        ),
-                    )
-                    .child(
-                        div()
-                            .w(px(44.0))
-                            .text_sm()
-                            .text_right()
-                            .child(format!("{:.0}%", shown * 100.0)),
-                    ),
+                    .justify_between()
+                    .text_xs()
+                    .text_color(theme::muted())
+                    .child(format_clock(elapsed))
+                    .child(format_clock(duration)),
             )
     }
 }
