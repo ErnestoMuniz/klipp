@@ -1426,30 +1426,32 @@ fn resize_handles(cx: &mut Context<MainWindow>) -> Vec<open_gpui::AnyElement> {
             .into_any_element()
     };
     vec![
-        // Bordas
+        // Bordas recuadas nos cantos: as faixas iam de ponta a ponta e
+        // roubavam o clique dos cantos (resize 1D em vez de 2D). Cada
+        // canto de 16px pertence só à sua alça diagonal.
         edge(
             "resize-top",
             ResizeEdge::Top,
             CursorStyle::ResizeUpDown,
-            div().absolute().top(px(0.0)).left(px(0.0)).right(px(0.0)).h(px(T)),
+            div().absolute().top(px(0.0)).left(px(C)).right(px(C)).h(px(T)),
         ),
         edge(
             "resize-bottom",
             ResizeEdge::Bottom,
             CursorStyle::ResizeUpDown,
-            div().absolute().bottom(px(0.0)).left(px(0.0)).right(px(0.0)).h(px(T)),
+            div().absolute().bottom(px(0.0)).left(px(C)).right(px(C)).h(px(T)),
         ),
         edge(
             "resize-left",
             ResizeEdge::Left,
             CursorStyle::ResizeLeftRight,
-            div().absolute().left(px(0.0)).top(px(0.0)).bottom(px(0.0)).w(px(T)),
+            div().absolute().left(px(0.0)).top(px(C)).bottom(px(C)).w(px(T)),
         ),
         edge(
             "resize-right",
             ResizeEdge::Right,
             CursorStyle::ResizeLeftRight,
-            div().absolute().right(px(0.0)).top(px(0.0)).bottom(px(0.0)).w(px(T)),
+            div().absolute().right(px(0.0)).top(px(C)).bottom(px(C)).w(px(T)),
         ),
         // Cantos (área maior para pegar fácil)
         edge(
