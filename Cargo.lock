@@ -2865,6 +2865,7 @@ dependencies = [
  "cosmic-text",
  "dirs",
  "env_logger",
+ "freetype-sys",
  "futures-util",
  "gpui-animation",
  "image",

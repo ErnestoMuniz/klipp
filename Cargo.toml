@@ -17,6 +17,9 @@ zbus = { version = "5", default-features = false, features = ["async-io"] }
 symphonia = { version = "0.5", default-features = false, features = ["all"] }
 libpulse-simple-sys = "1.4"
 libpulse-sys = "1.4"
+# freetype do sistema no ubuntu-22.04 (CI) é velho demais para o
+# freetype-sys: compila o vendored (unifica feature no build todo).
+freetype-sys = { version = "0.23", features = ["bundled"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 dirs = "6"
