@@ -2,6 +2,12 @@
 name = "klipp"
 version = "0.1.0"
 edition = "2024"
+description = "Desktop soundboard with a quick overlay and virtual microphone routing."
+license = "GPL-3.0-only"
+authors = ["Ernesto Muniz"]
+repository = "https://github.com/ErnestoMuniz/klipp"
+homepage = "https://github.com/ErnestoMuniz/klipp"
+rust-version = "1.85"
 
 [dependencies]
 open-gpui = "0.2"
@@ -23,10 +29,11 @@ smallvec = "1"
 notify = "8"
 gpui-animation = { path = "vendor/gpui-animation" }
 ureq = { version = "2", features = ["json"] }
-mouse-coords = { path = "../../mouse-coords" }
+mouse-coords = { path = "vendor/mouse-coords" }
 cosmic-text = "0.19"
 swash = "0.2"
 resvg = { version = "0.46", default-features = false, features = ["text", "system-fonts"] }
+ksni = { version = "0.3.6", default-features = false, features = ["async-io"] }
 
 [profile.dev]
 opt-level = 1

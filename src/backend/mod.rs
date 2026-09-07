@@ -6,6 +6,7 @@ pub mod playback;
 pub mod pulse;
 pub mod shortcuts;
 pub mod sounds;
+pub mod tray;
 
 pub use audio_graph::AudioGraph;
 pub use playback::Engine;

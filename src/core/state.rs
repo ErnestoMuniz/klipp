@@ -87,6 +87,8 @@ pub struct Shared {
     pub about_anim_start: u128,
     pub mic_pass: bool,
     pub hear_clips: bool,
+    /// Fechar a janela mantém o app no tray (padrão ligado).
+    pub run_in_background: bool,
     pub settings_open: bool,
     /// Fechando: overlay continua montado tocando a animação reversa.
     pub settings_closing: bool,
@@ -181,7 +183,7 @@ impl Shared {
             play_request: None,
             stop_request: false,
             confirm_request: false,
-            show_hint: true,
+            show_hint: settings.show_hints,
             search: String::new(),
             search_focused: false,
             search_selected: false,
@@ -199,6 +201,7 @@ impl Shared {
             about_anim_start: 0,
             mic_pass: settings.mic_passthrough,
             hear_clips: settings.hear_clips,
+            run_in_background: settings.run_in_background,
             settings_open: false,
             settings_closing: false,
             settings_anim_start: 0,

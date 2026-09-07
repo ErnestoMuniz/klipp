@@ -77,12 +77,12 @@ fn window_button(
     let asset = asset.to_string();
     div()
         .id(id)
-        .on_click(cx.listener(move |_this, _event, window, cx| {
+        .on_click(cx.listener(move |this, _event, window, cx| {
             cx.stop_propagation();
             match id {
                 "win-min" => window.minimize_window(),
                 "win-max" | "win-restore" => window.zoom_window(),
-                _ => cx.quit(),
+                _ => this.request_close(window, cx),
             }
         }))
         .size(px(26.0))

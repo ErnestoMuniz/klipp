@@ -69,6 +69,8 @@ pub struct MainWindow {
     text_drag: Option<(TextField, f32)>,
     last_ver: u64,
     last_overlay_active: bool,
+    /// `on_window_should_close` registrado (uma vez por janela).
+    close_hooked: bool,
 }
 
 impl MainWindow {
@@ -100,6 +102,7 @@ impl MainWindow {
             text_drag: None,
             last_ver: 1,
             last_overlay_active: false,
+            close_hooked: false,
         };
 
         // Um overlay fullscreen por display: o compositor fixa cada surface
@@ -249,23 +252,28 @@ impl MainWindow {
     }
 
     /// Observa a pasta de sons e espelha mudanças externas na UI.
+    /// Uma vez por processo (reabrir a janela não duplica o watcher).
     fn spawn_fs_watcher(&self) {
+        static WATCHER_ONCE: std::sync::OnceLock<()> = std::sync::OnceLock::new();
         let shared = self.shared.clone();
         let engine = self.engine.clone();
-        std::thread::Builder::new()
-            .name("klipp-watch".into())
-            .spawn(move || {
-                if let Err(err) = backend::sounds::watch_loop(shared, engine) {
-                    log::warn!("fs watcher encerrou: {err:?}");
-                }
-            })
-            .ok();
+        WATCHER_ONCE.get_or_init(|| {
+            std::thread::Builder::new()
+                .name("klipp-watch".into())
+                .spawn(move || {
+                    if let Err(err) = backend::sounds::watch_loop(shared, engine) {
+                        log::warn!("fs watcher encerrou: {err:?}");
+                    }
+                })
+                .ok();
+        });
     }
 
     // -- services (backend) -------------------------------------------------
 
     fn spawn_background_tasks(&self, cx: &mut Context<Self>) {
         // Inicializa o grafo de áudio (virtual mic) em background.
+        // (Roda a cada janela: re-sincroniza o mic após reabrir via tray.)
         let graph_bg = self.graph.clone();
         let shared_g = self.shared.clone();
         cx.background_executor()
@@ -300,16 +308,30 @@ impl MainWindow {
             })
             .detach();
 
-        // Escuta o portal de atalhos globais.
+        // Escuta o portal de atalhos globais (uma vez por processo: o
+        // `Shared` é único, um segundo listener duplicaria os disparos).
+        // Mesmo padrão para o tray icon e o fs watcher.
+        static SHORTCUTS_ONCE: std::sync::OnceLock<()> = std::sync::OnceLock::new();
+        static TRAY_ONCE: std::sync::OnceLock<()> = std::sync::OnceLock::new();
         let shared_h = self.shared.clone();
         let preferred = self.shared.lock().unwrap().shortcut.clone();
-        cx.background_executor()
-            .spawn(async move {
-                if let Err(err) = backend::shortcuts::run(shared_h, preferred).await {
-                    log::warn!("atalho global indisponível: {err}");
-                }
-            })
-            .detach();
+        SHORTCUTS_ONCE.get_or_init(|| {
+            cx.background_executor()
+                .spawn(async move {
+                    if let Err(err) = backend::shortcuts::run(shared_h, preferred).await {
+                        log::warn!("atalho global indisponível: {err}");
+                    }
+                })
+                .detach();
+        });
+        let shared_t = self.shared.clone();
+        TRAY_ONCE.get_or_init(|| {
+            cx.background_executor()
+                .spawn(async move {
+                    backend::tray::run(shared_t).await;
+                })
+                .detach();
+        });
     }
 
     fn spawn_poller(&self, cx: &mut Context<Self>) {
@@ -325,9 +347,14 @@ impl MainWindow {
                         cx.background_executor()
                             .timer(std::time::Duration::from_millis(66))
                             .await;
-                        let _ = cx.update(|app| {
-                            let _ = this.update(app, |this, cx| this.on_tick(cx));
+                        // Janela fechada (modo tray): encerra o poller em vez
+                        // de girar em falso sobre a entidade morta.
+                        let alive = cx.update(|app| {
+                            this.update(app, |this, cx| this.on_tick(cx)).is_ok()
                         });
+                        if !alive {
+                            break;
+                        }
                     }
                 }
             },
@@ -588,6 +615,8 @@ impl MainWindow {
             language: s.lang.clone(),
             mic_passthrough: s.mic_pass,
             hear_clips: s.hear_clips,
+            run_in_background: s.run_in_background,
+            show_hints: s.show_hint,
             volume: s.volume,
             mic_source: s.mic_source.clone(),
         });
@@ -596,6 +625,7 @@ impl MainWindow {
     pub(crate) fn dismiss_hint(&self, cx: &mut Context<Self>) {
         self.shared.lock().unwrap().show_hint = false;
         self.shared.lock().unwrap().bump();
+        self.persist_prefs();
         cx.notify();
     }
 
@@ -603,6 +633,8 @@ impl MainWindow {
         let mut s = self.shared.lock().unwrap();
         s.show_hint = !s.show_hint;
         s.bump();
+        drop(s);
+        self.persist_prefs();
         cx.notify();
     }
 
@@ -1019,6 +1051,30 @@ impl MainWindow {
         cx.notify();
     }
 
+    /// Liga/desliga o "continuar no tray ao fechar". Lido ao vivo nos
+    /// caminhos de fechar, então vale na hora (sem reiniciar).
+    pub(crate) fn set_run_in_background(&self, on: bool, cx: &mut Context<Self>) {
+        self.shared.lock().unwrap().run_in_background = on;
+        self.shared.lock().unwrap().bump();
+        self.persist_prefs();
+        cx.notify();
+    }
+
+    /// X da titlebar: fecha só a janela (o tray reabre) ou encerra tudo,
+    /// conforme a configuração.
+    pub(crate) fn request_close(&self, window: &mut Window, cx: &mut Context<Self>) {
+        if self
+            .shared
+            .lock()
+            .map(|s| s.run_in_background)
+            .unwrap_or(true)
+        {
+            window.remove_window();
+        } else {
+            cx.quit();
+        }
+    }
+
     pub(crate) fn toggle_mic_open(&self, cx: &mut Context<Self>) {
         // Atualiza a lista a cada abertura (dispositivo pode ter plugado).
         if !self.shared.lock().unwrap().mic_open {
@@ -1192,7 +1248,7 @@ fn overlay_options(kind: WindowKind, display_id: Option<open_gpui::DisplayId>) -
         display_id,
         window_background: WindowBackgroundAppearance::Transparent,
         window_decorations: Some(WindowDecorations::Client),
-        app_id: Some("klipp".into()),
+        app_id: Some("io.github.ErnestoMuniz.Klipp".into()),
         titlebar: None,
         ..Default::default()
     }
@@ -1200,7 +1256,7 @@ fn overlay_options(kind: WindowKind, display_id: Option<open_gpui::DisplayId>) -
 
 fn default_layer_shell_options() -> LayerShellOptions {
     LayerShellOptions {
-        namespace: "klipp".into(),
+        namespace: "io.github.ErnestoMuniz.Klipp".into(),
         layer: Layer::Overlay,
         // Fullscreen: ancora nas 4 bordas para esticar na tela inteira.
         // Com `Anchor::empty()` a janela ficava flutuante/centrada e o
@@ -1218,6 +1274,21 @@ fn default_layer_shell_options() -> LayerShellOptions {
 
 impl Render for MainWindow {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        // Intercepta o fechar do WM (ex. Alt+F4): com "rodar em fundo"
+        // ligado a janela fecha e o app continua no tray; desligado,
+        // encerra (o X da titlebar passa pelo mesmo `request_close`).
+        // Sem isso, fechar pelo WM deixava o processo zumbi (os overlays
+        // por display impedem o auto-quit do GPUI).
+        if !self.close_hooked {
+            self.close_hooked = true;
+            let shared = self.shared.clone();
+            window.on_window_should_close(cx, move |_window, cx| {
+                if !shared.lock().map(|s| s.run_in_background).unwrap_or(true) {
+                    cx.quit();
+                }
+                true
+            });
+        }
         let (
             shortcut,
             last_error,

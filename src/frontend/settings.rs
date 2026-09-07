@@ -14,13 +14,14 @@ use super::ui::icon_action_btn;
 /// Drawer lateral de settings (Image 2). Backdrop fecha ao clicar fora.
 impl MainWindow {
     pub(crate) fn settings_overlay(&self, cx: &mut Context<Self>) -> impl IntoElement {
-        let (open, closing, mic_pass, hear, mic_source, mic_sources, mic_open, shortcut, theme_pref, lang, lang_open, rebinding) = {
+        let (open, closing, mic_pass, hear, run_in_background, mic_source, mic_sources, mic_open, shortcut, theme_pref, lang, lang_open, rebinding) = {
             let s = self.shared.lock().unwrap();
             (
                 s.settings_open,
                 s.settings_closing,
                 s.mic_pass,
                 s.hear_clips,
+                s.run_in_background,
                 s.mic_source.clone(),
                 s.mic_sources.clone(),
                 s.mic_open,
@@ -110,6 +111,14 @@ impl MainWindow {
                                             &[("shortcut", &shortcut)],
                                         )),
                                 )
+                                .child(section_label(&t(&lang, "settings.tray_group")))
+                                .child(self.switch_row(
+                                    run_in_background,
+                                    &t(&lang, "settings.tray_label"),
+                                    "tray-bg",
+                                    SwitchTarget::RunInBackground,
+                                    cx,
+                                ))
                                 .child(section_label(&t(&lang, "settings.discord_group")))
                                 .child(discord_hint(&lang))
                                 .child(about_button(&lang, cx))
@@ -188,7 +197,10 @@ impl MainWindow {
             .items_center()
             .gap_3()
             .child(switch(on, id, target, cx))
-            .child(div().flex_1().text_sm().child(label.to_string()))
+            // `min_w(0)`: sem isso o item flex não encolhe e o texto
+            // (ex. "Pass my microphone through…") estoura o drawer
+            // em vez de quebrar linha.
+            .child(div().flex_1().min_w(px(0.0)).text_sm().child(label.to_string()))
     }
 }
 
@@ -196,6 +208,7 @@ impl MainWindow {
 enum SwitchTarget {
     MicPass,
     HearClips,
+    RunInBackground,
 }
 
 /// Bolinha animada via `with_animation`: o id inclui o estado, então
@@ -216,6 +229,7 @@ fn switch(
                 match target {
                     SwitchTarget::MicPass => this.set_mic_pass(!on, cx),
                     SwitchTarget::HearClips => this.set_hear_clips(!on, cx),
+                    SwitchTarget::RunInBackground => this.set_run_in_background(!on, cx),
                 }
             }),
         )
@@ -616,6 +630,7 @@ fn discord_hint(lang: &str) -> impl IntoElement {
     div()
         .flex()
         .flex_row()
+        .flex_wrap()
         .items_center()
         .gap_1()
         .text_sm()

@@ -32,6 +32,12 @@ pub struct Settings {
     /// Fonte do mic real escolhida no drawer (vazio = auto-detect).
     #[serde(default)]
     pub mic_source: String,
+    /// Manter rodando no tray ao fechar a janela (padrão ligado).
+    #[serde(default = "default_true")]
+    pub run_in_background: bool,
+    /// Banner de dica do atalho (lâmpada da toolbar, padrão ligado).
+    #[serde(default = "default_true")]
+    pub show_hints: bool,
 }
 
 fn default_density() -> String {
@@ -66,6 +72,8 @@ impl Default for Settings {
             hear_clips: true,
             volume: 1.0,
             mic_source: String::new(),
+            run_in_background: true,
+            show_hints: true,
         }
     }
 }
@@ -90,5 +98,25 @@ pub fn save(settings: &Settings) {
     }
     if let Ok(raw) = serde_json::to_string_pretty(settings) {
         let _ = std::fs::write(settings_path(), raw);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn run_in_background_sobrevive_ao_roundtrip() {
+        // Desligado persiste desligado (o toggle vale entre sessões).
+        let mut s = Settings::default();
+        assert!(s.run_in_background);
+        s.run_in_background = false;
+        let raw = serde_json::to_string(&s).unwrap();
+        let back: Settings = serde_json::from_str(&raw).unwrap();
+        assert!(!back.run_in_background);
+        // settings.json antigo (sem as chaves) assume ligado.
+        let old: Settings = serde_json::from_str(r#"{"shortcut":"x"}"#).unwrap();
+        assert!(old.run_in_background);
+        assert!(old.show_hints);
     }
 }
