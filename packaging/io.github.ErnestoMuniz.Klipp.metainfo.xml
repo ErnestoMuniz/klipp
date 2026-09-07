@@ -38,6 +38,11 @@
   </developer>
   <content_rating type="oars-1.1" />
   <releases>
+    <release version="0.2.0" date="2026-09-07">
+      <description>
+        <p>AppImage sem sandbox, atalho global nativo do KDE (KGlobalAccel configurável no app), instância única com --toggle-overlay/--show.</p>
+      </description>
+    </release>
     <release version="0.1.0" date="2026-09-06">
       <description>
         <p>Initial Rust + GPUI rewrite as Flatpak.</p>

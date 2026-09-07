@@ -99,7 +99,7 @@ pub async fn run(shared: Arc<std::sync::Mutex<Shared>>, preferred: String) -> an
         Err(err) => {
             set_shared(&shared, |s| {
                 let lang = s.lang.clone();
-                s.last_error = Some(friendly_portal_error(&lang, &err));
+                s.shortcut_error = Some(friendly_portal_error(&lang, &err));
                 s.bump();
             });
             return Ok(());
@@ -117,6 +117,7 @@ pub async fn run(shared: Arc<std::sync::Mutex<Shared>>, preferred: String) -> an
             } else {
                 set_shared(&shared, |s| {
                     s.shortcut = trigger;
+                    s.shortcut_error = None;
                     s.bump();
                 });
             }
@@ -127,7 +128,7 @@ pub async fn run(shared: Arc<std::sync::Mutex<Shared>>, preferred: String) -> an
         Err(err) => {
             set_shared(&shared, |s| {
                 let lang = s.lang.clone();
-                s.last_error = Some(friendly_portal_error(&lang, &err));
+                s.shortcut_error = Some(friendly_portal_error(&lang, &err));
                 s.bump();
             });
             return Ok(());
@@ -149,50 +150,9 @@ pub async fn run(shared: Arc<std::sync::Mutex<Shared>>, preferred: String) -> an
                 log::info!("atalho activated: {}", event.shortcut_id());
                 if event.shortcut_id() == OVERLAY_ID {
                     // Ativa na hora (fallback central no primário) e resolve
-                    // a posição exata em thread dedicada: `get_position()` é
-                    // bloqueante e não pode travar o executor.
+                    // a posição exata em thread dedicada (ver backend::overlay).
                     log::info!("atalho opts: {:?}", event.options());
-                    set_shared(&shared, |s| {
-                        // Com áudio tocando, o centro (stop) já nasce
-                        // selecionado: soltar o atalho para na hora, sem
-                        // precisar mirar.
-                        let stopping = s.playing.is_some();
-                        s.overlay_active = true;
-                        s.overlay_fading = false;
-                        s.overlay_seq = s.overlay_seq.wrapping_add(1);
-                        s.overlay_anchor = None;
-                        s.anchor_needs_confirm = true;
-                        s.pie_hovered = None;
-                        s.center_hovered = stopping;
-                        s.confirm_request = false;
-                        s.bump();
-                    });
-                    let shared_bg = shared.clone();
-                    std::thread::Builder::new()
-                        .name("klipp-cursor".into())
-                        .spawn(move || {
-                            match mouse_coords::get_position() {
-                                Ok(pos) => {
-                                    log::info!(
-                                        "atalho cursor: ({}, {})",
-                                        pos.x,
-                                        pos.y
-                                    );
-                                    set_shared(&shared_bg, |s| {
-                                        if s.overlay_active {
-                                            s.overlay_anchor =
-                                                Some((pos.x as f32, pos.y as f32));
-                                            s.anchor_needs_confirm = false;
-                                            s.bump();
-                                        }
-                                    });
-                                }
-                                Err(err) => {
-                                    log::info!("atalho cursor indisponível: {err}");
-                                }
-                            }
-                        })
-                        .ok();
+                    crate::backend::overlay::open(&shared);
                 }
             }
             event = deactivated.next() => {
@@ -212,6 +172,7 @@ pub async fn run(shared: Arc<std::sync::Mutex<Shared>>, preferred: String) -> an
                     let trigger = shortcut.trigger_description().to_string();
                     set_shared(&shared, |s| {
                         s.shortcut = trigger.clone();
+                        s.shortcut_error = None;
                         s.bump();
                     });
                     let mut settings = crate::core::settings::load();
@@ -265,6 +226,7 @@ pub async fn rebind(shared: Arc<std::sync::Mutex<Shared>>) -> anyhow::Result<()>
     match result {
         Ok(Some(trigger)) => {
             s.shortcut = trigger.clone();
+            s.shortcut_error = None;
             let mut settings = crate::core::settings::load();
             settings.shortcut = trigger;
             crate::core::settings::save(&settings);
@@ -277,7 +239,7 @@ pub async fn rebind(shared: Arc<std::sync::Mutex<Shared>>) -> anyhow::Result<()>
             // Usuário fechou o diálogo sem escolher: não é erro.
             if !msg.contains("Cancelled") && !msg.contains("cancelled") {
                 let lang = s.lang.clone();
-                s.last_error = Some(friendly_portal_error(&lang, &err));
+                s.shortcut_error = Some(friendly_portal_error(&lang, &err));
             }
         }
     }
@@ -292,7 +254,7 @@ fn set_shared(shared: &Arc<std::sync::Mutex<Shared>>, f: impl FnOnce(&mut Shared
     }
 }
 
-/// Explica o erro mais comum fora do Flatpak (portal exige app-id).
+/// Explica o erro mais comum sem sandbox (portal exige app-id).
 fn friendly_portal_error(lang: &str, err: &anyhow::Error) -> String {
     let msg = err.to_string();
     if msg.contains("An app id is required") {
@@ -312,5 +274,40 @@ mod tests {
         assert_eq!(spec_trigger("[Alt+Shift+S]"), "ALT+SHIFT+S");
         assert_eq!(spec_trigger("ctrl+alt+a"), "CTRL+ALT+a");
         assert_eq!(spec_trigger("Super+Shift+X"), "LOGO+SHIFT+X");
+    }
+
+    /// Sonda: o portal GlobalShortcuts aceita chamador SEM sandbox?
+    ///
+    /// `run()` só retorna em erro fatal (ex. app-id); em sucesso escuta
+    /// para sempre (diálogo do sistema pendente). Logo, retorno rápido +
+    /// `last_error` = RECUSA; timeout = ACEITA (ainda escutando).
+    /// Ignorado por padrão (precisa de sessão + pode abrir diálogo):
+    /// `cargo test portal_bind -- --ignored --nocapture`.
+    #[test]
+    #[ignore]
+    fn portal_bind_fora_do_sandbox() {
+        use std::sync::{Arc, Mutex};
+        use std::time::Duration;
+
+        use futures_util::future::{select, Either};
+        use futures_util::pin_mut;
+
+        use crate::core::settings::Settings;
+        use crate::core::state::Shared;
+
+        let shared = Arc::new(Mutex::new(Shared::new(&Settings::default())));
+        let outcome = async_io::block_on(async {
+            let run = super::run(shared.clone(), "Alt+Shift+S".to_string());
+            let wait = async_io::Timer::after(Duration::from_secs(8));
+            pin_mut!(run);
+            pin_mut!(wait);
+            match select(run, wait).await {
+                Either::Left(_) => "returned",
+                Either::Right(_) => "listening",
+            }
+        });
+        let err = shared.lock().unwrap().last_error.clone();
+        println!("portal fora do sandbox: {outcome} last_error={err:?}");
+        assert_eq!(outcome, "listening", "portal recusou: {err:?}");
     }
 }

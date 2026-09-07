@@ -1,6 +1,9 @@
 pub mod audio_graph;
 pub mod decode;
+pub mod ipc;
+pub mod native_shortcuts;
 pub mod online;
+pub mod overlay;
 pub mod pick;
 pub mod playback;
 pub mod pulse;

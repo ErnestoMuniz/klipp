@@ -18,7 +18,7 @@ fn queue() -> &'static Mutex<Vec<TrayEvent>> {
     QUEUE.get_or_init(|| Mutex::new(Vec::new()))
 }
 
-fn push_event(ev: TrayEvent) {
+pub(crate) fn push_event(ev: TrayEvent) {
     if let Ok(mut q) = queue().lock() {
         q.push(ev);
     }

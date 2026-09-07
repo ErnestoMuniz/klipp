@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Dev run: faz o xdg-desktop-portal aceitar o klipp como app com app-id
-# (fora do Flatpak o portal recusa "An app id is required").
-# Em produção (Flatpak) isso não é necessário.
+# (sem sandbox o portal recusa "An app id is required").
+# Em produção (AppImage) o atalho global usa atalho custom do DE.
 set -euo pipefail
 
 FAKE_INFO="$(mktemp)"

@@ -52,6 +52,8 @@ pub struct MainWindow {
     pub(crate) editor_focus: FocusHandle,
     pub(crate) editor_search_focus: FocusHandle,
     pub(crate) browse_focus: FocusHandle,
+    /// Captura da nova combinação no gravador de atalho (nativo).
+    pub(crate) shortcut_focus: FocusHandle,
     /// Card sob o mouse (para revelar as ações). Estado local da view.
     pub(crate) hovered_card: Option<usize>,
     /// Arrastar no slider de volume: botão segurado após pressionar a trilha.
@@ -94,6 +96,7 @@ impl MainWindow {
             editor_focus: cx.focus_handle(),
             editor_search_focus: cx.focus_handle(),
             browse_focus: cx.focus_handle(),
+            shortcut_focus: cx.focus_handle(),
             hovered_card: None,
             vol_dragging: false,
             vol_track: Arc::new(Mutex::new(None)),
@@ -308,21 +311,34 @@ impl MainWindow {
             })
             .detach();
 
-        // Escuta o portal de atalhos globais (uma vez por processo: o
-        // `Shared` é único, um segundo listener duplicaria os disparos).
-        // Mesmo padrão para o tray icon e o fs watcher.
+        // Escuta o atalho global (uma vez por processo: o `Shared` é
+        // único, um segundo listener duplicaria os disparos). Nativo do
+        // KDE fora de sandbox (KGlobalAccel, sem portal); portal no
+        // sandbox ou em outros DEs. Mesmo padrão para tray e fs watcher.
         static SHORTCUTS_ONCE: std::sync::OnceLock<()> = std::sync::OnceLock::new();
         static TRAY_ONCE: std::sync::OnceLock<()> = std::sync::OnceLock::new();
         let shared_h = self.shared.clone();
-        let preferred = self.shared.lock().unwrap().shortcut.clone();
+        let native = crate::backend::native_shortcuts::using_native();
         SHORTCUTS_ONCE.get_or_init(|| {
-            cx.background_executor()
-                .spawn(async move {
-                    if let Err(err) = backend::shortcuts::run(shared_h, preferred).await {
-                        log::warn!("atalho global indisponível: {err}");
-                    }
-                })
-                .detach();
+            if native {
+                let shared_n = shared_h.clone();
+                cx.background_executor()
+                    .spawn(async move {
+                        if let Err(err) = backend::native_shortcuts::run(shared_n).await {
+                            log::warn!("atalho nativo indisponível: {err}");
+                        }
+                    })
+                    .detach();
+            } else {
+                let preferred = self.shared.lock().unwrap().shortcut.clone();
+                cx.background_executor()
+                    .spawn(async move {
+                        if let Err(err) = backend::shortcuts::run(shared_h, preferred).await {
+                            log::warn!("atalho global indisponível: {err}");
+                        }
+                    })
+                    .detach();
+            }
         });
         let shared_t = self.shared.clone();
         TRAY_ONCE.get_or_init(|| {
@@ -992,15 +1008,32 @@ impl MainWindow {
         }
     }
 
-    /// Botão do atalho: reabre o popup de escolha do portal.
-    pub(crate) fn rebind_shortcut(&self, cx: &mut Context<Self>) {
+    /// Botão do atalho: no nativo (KDE) entra em modo de gravação (a
+    /// próxima combinação pressionada vira o atalho); no portal, reabre
+    /// o popup de escolha do sistema.
+    pub(crate) fn rebind_shortcut(
+        &self,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
         if self.shared.lock().unwrap().shortcut_rebinding {
+            return;
+        }
+        if crate::backend::native_shortcuts::using_native() {
+            let mut s = self.shared.lock().unwrap();
+            s.shortcut_rebinding = true;
+            s.shortcut_error = None;
+            s.bump();
+            drop(s);
+            window.focus(&self.shortcut_focus, cx);
+            cx.notify();
             return;
         }
         // Feedback imediato (a task de portal pode demorar a acordar).
         {
             let mut s = self.shared.lock().unwrap();
             s.shortcut_rebinding = true;
+            s.shortcut_error = None;
             s.bump();
         }
         cx.notify();
@@ -1012,6 +1045,83 @@ impl MainWindow {
                 }
             })
             .detach();
+    }
+
+    /// Gravador in-app (atalho nativo): a próxima combinação com o box
+    /// focado vira o atalho global. Esc cancela, modificador puro espera.
+    pub(crate) fn on_shortcut_record(
+        &self,
+        event: &open_gpui::KeyDownEvent,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        if !self.shared.lock().unwrap().shortcut_rebinding {
+            return;
+        }
+        cx.stop_propagation();
+        let ks = &event.keystroke;
+        let key = ks.key.as_str();
+        if key.eq_ignore_ascii_case("escape") {
+            let mut s = self.shared.lock().unwrap();
+            s.shortcut_rebinding = false;
+            s.bump();
+            drop(s);
+            window.blur();
+            cx.notify();
+            return;
+        }
+        if is_modifier_key(key) {
+            return;
+        }
+        let Some(spec) = recorded_spec(ks) else {
+            self.record_failed("invalid", window, cx);
+            return;
+        };
+        // Exibe na hora; o D-Bus confirma em background (o poller repinta).
+        {
+            let mut s = self.shared.lock().unwrap();
+            s.shortcut = spec.clone();
+            s.bump();
+        }
+        cx.notify();
+        window.blur();
+        let shared = self.shared.clone();
+        cx.background_executor()
+            .spawn(async move {
+                match crate::backend::native_shortcuts::set_shortcut(&shared, &spec).await {
+                    Ok(_) => {
+                        shared.lock().unwrap().shortcut_error = None;
+                    }
+                    Err(err) => {
+                        let kind = err.to_string();
+                        let mut s = shared.lock().unwrap();
+                        let lang = s.lang.clone();
+                        s.shortcut_error = Some(if kind.contains("taken") {
+                            t(&lang, "err.shortcut_taken")
+                        } else {
+                            t(&lang, "err.shortcut_invalid")
+                        });
+                    }
+                }
+                shared.lock().unwrap().shortcut_rebinding = false;
+                shared.lock().unwrap().bump();
+            })
+            .detach();
+    }
+
+    fn record_failed(&self, kind: &str, window: &mut Window, cx: &mut Context<Self>) {
+        let mut s = self.shared.lock().unwrap();
+        let lang = s.lang.clone();
+        s.shortcut_error = Some(if kind == "taken" {
+            t(&lang, "err.shortcut_taken")
+        } else {
+            t(&lang, "err.shortcut_invalid")
+        });
+        s.shortcut_rebinding = false;
+        s.bump();
+        drop(s);
+        window.blur();
+        cx.notify();
     }
 
     pub(crate) fn close_settings(&self, cx: &mut Context<Self>) {
@@ -1611,9 +1721,92 @@ fn vol_fraction_in(bounds: open_gpui::Bounds<open_gpui::Pixels>, x: f32) -> Opti
     Some(((x - f32::from(bounds.origin.x)) / w).clamp(0.0, 1.0))
 }
 
+/// Tecla que é só modificador: o gravador espera o resto da combinação.
+fn is_modifier_key(key: &str) -> bool {
+    matches!(
+        key.to_ascii_lowercase().as_str(),
+        "shift" | "control" | "ctrl" | "alt" | "altgr" | "meta" | "super" | "logo" | "win" | "hyper"
+    )
+}
+
+/// `"Ctrl+Alt+A"` a partir do keystroke GPUI (ou `None` se inválido).
+/// A exibição é normalizada via Qt codec (mesmo formato do daemon).
+fn recorded_spec(ks: &open_gpui::Keystroke) -> Option<String> {
+    let mut parts: Vec<String> = Vec::new();
+    if ks.modifiers.control {
+        parts.push("Ctrl".to_string());
+    }
+    if ks.modifiers.alt {
+        parts.push("Alt".to_string());
+    }
+    if ks.modifiers.shift {
+        parts.push("Shift".to_string());
+    }
+    if ks.modifiers.platform {
+        parts.push("Meta".to_string());
+    }
+    parts.push(recorded_key_name(ks.key_char.as_deref(), &ks.key)?);
+    let spec = parts.join("+");
+    // Valida (regra do modificador) e normaliza a exibição.
+    let code = crate::backend::native_shortcuts::qt_encode(&spec).ok()?;
+    Some(crate::backend::native_shortcuts::qt_decode(code))
+}
+
+/// Nome da tecla gravada: prefere o `key_char` imprimível, cai para o
+/// `key` (letra impressa na tecla). Com Ctrl o `key_char` vira caractere
+/// de controle — por isso o fallback existe (Ctrl+Alt+T chega com
+/// `key="t"` e sem `key_char` utilizável).
+fn recorded_key_name(key_char: Option<&str>, key: &str) -> Option<String> {
+    if let Some(text) = key_char {
+        if text.chars().count() == 1 {
+            let c = text.chars().next().unwrap();
+            if c.is_ascii_alphanumeric() {
+                return Some(c.to_ascii_uppercase().to_string());
+            }
+            if c == ' ' {
+                return Some("Space".to_string());
+            }
+        }
+    }
+    let n = key.to_ascii_lowercase();
+    if n.chars().count() == 1 {
+        let c = n.chars().next().unwrap();
+        if c.is_ascii_alphanumeric() {
+            return Some(c.to_ascii_uppercase().to_string());
+        }
+        if c == ' ' {
+            return Some("Space".to_string());
+        }
+        return None;
+    }
+    if n.len() > 1
+        && n.starts_with('f')
+        && n[1..].parse::<u32>().is_ok_and(|f| (1..=12).contains(&f))
+    {
+        return Some(format!("F{}", &n[1..]));
+    }
+    match n.as_str() {
+        "space" => Some("Space".to_string()),
+        "enter" | "return" => Some("Enter".to_string()),
+        "tab" => Some("Tab".to_string()),
+        "backspace" => Some("Backspace".to_string()),
+        "delete" => Some("Delete".to_string()),
+        "insert" => Some("Insert".to_string()),
+        "home" => Some("Home".to_string()),
+        "end" => Some("End".to_string()),
+        "pageup" => Some("PageUp".to_string()),
+        "pagedown" => Some("PageDown".to_string()),
+        "up" => Some("Up".to_string()),
+        "down" => Some("Down".to_string()),
+        "left" => Some("Left".to_string()),
+        "right" => Some("Right".to_string()),
+        _ => None,
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use super::vol_fraction_in;
+    use super::{recorded_key_name, recorded_spec, vol_fraction_in};
 
     fn bounds_at(x: f32, w: f32) -> open_gpui::Bounds<open_gpui::Pixels> {
         open_gpui::Bounds {
@@ -1635,5 +1828,36 @@ mod tests {
         assert!((mid - 0.5).abs() < 1e-6, "meio: {mid}");
         // Largura zerada não mapeia.
         assert_eq!(vol_fraction_in(bounds_at(0.0, 0.0), 10.0), None);
+    }
+
+    #[test]
+    fn gravador_prefere_key_char_e_cai_para_key() {
+        // Shift+Alt+S normal: key_char utilizável.
+        assert_eq!(recorded_key_name(Some("S"), "s"), Some("S".to_string()));
+        // Ctrl+Alt+T: key_char vira controle — usa o key ("t").
+        assert_eq!(recorded_key_name(Some("\u{14}"), "t"), Some("T".to_string()));
+        assert_eq!(recorded_key_name(None, "t"), Some("T".to_string()));
+        assert_eq!(recorded_key_name(None, "F5"), Some("F5".to_string()));
+        assert_eq!(recorded_key_name(None, "space"), Some("Space".to_string()));
+        assert_eq!(recorded_key_name(None, "enter"), Some("Enter".to_string()));
+        assert_eq!(recorded_key_name(Some("\u{14}"), "Control_L"), None);
+    }
+
+    #[test]
+    fn spec_gravado_ctrl_alt_letra() {
+        use open_gpui::{Keystroke, Modifiers};
+        let ks = Keystroke {
+            modifiers: Modifiers {
+                control: true,
+                alt: true,
+                shift: false,
+                platform: false,
+                function: false,
+            },
+            // Ctrl+Alt+T: key_char inutilizável, key com a letra.
+            key: "t".to_string(),
+            key_char: None,
+        };
+        assert_eq!(recorded_spec(&ks), Some("Ctrl+Alt+T".to_string()));
     }
 }

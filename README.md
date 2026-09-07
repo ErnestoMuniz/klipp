@@ -36,8 +36,8 @@
 - Rust stable toolchain
 - `pactl` compatible with PulseAudio or PipeWire-Pulse (only needed for the
   virtual microphone; everything else works without it)
-- An `xdg-desktop-portal` backend for the global shortcut and file picker
-  (production Flatpak provides the app id; see `scripts/dev-run.sh` for dev)
+- An `xdg-desktop-portal` backend for the file picker
+  (`scripts/dev-run.sh` fakes the portal app-id for dev)
 
 ## Run from source
 
@@ -46,59 +46,11 @@ cargo run
 ```
 
 `scripts/dev-run.sh` wraps the binary with the portal app-id workaround
-needed outside Flatpak. Tests:
+needed for portal APIs without a sandbox. Tests:
 
 ```sh
 cargo test
 ```
-
-## Flatpak
-
-App ID: `io.github.ErnestoMuniz.Klipp` (same as the old Electron app, so
-`~/.var/app/io.github.ErnestoMuniz.Klipp/` keeps working).
-
-Manifest + metadata live in `packaging/`:
-
-- `io.github.ErnestoMuniz.Klipp.yml` — freedesktop 25.08 + `rust-stable`
-  extension, offline build via `cargo-sources.json`
-- `io.github.ErnestoMuniz.Klipp.desktop` / `.metainfo.xml` + `icons/`
-- `cargo-sources.json` — generated from `Cargo.lock` (commit it; regenerate
-  whenever `Cargo.lock` changes)
-- `build.sh` — installs SDK, regenerates sources if stale, builds and
-  installs `--user`
-
-```sh
-# one-time deps (Fedora):
-sudo dnf install -y flatpak-builder
-
-# build + install locally:
-./packaging/build.sh
-
-# also emit a single-file bundle:
-./packaging/build.sh --bundle
-
-# run:
-flatpak run io.github.ErnestoMuniz.Klipp
-```
-
-Regenerate sources manually after changing dependencies:
-
-```sh
-uv run --with tomlkit --with aiohttp python /tmp/flatpak-cargo-generator.py \
-  Cargo.lock -o packaging/cargo-sources.json
-# (script from https://github.com/flatpak/flatpak-builder-tools/tree/master/cargo)
-```
-
-Notes:
-
-- `src/main.rs` + overlay use `app_id = "io.github.ErnestoMuniz.Klipp"` —
-  required for Wayland and the GlobalShortcuts portal inside Flatpak.
-- `vendor/mouse-coords` is vendored in-tree so the Flatpak source is
-  self-contained (no `../../` path dependency).
-- Sandbox permissions are minimal: Wayland + fallback X11, PulseAudio,
-  DRI, network (myinstants browsing). Sounds/settings stay in the
-  sandbox (`~/.var/app/…`) — no extra `--filesystem` needed. `pactl`
-  comes from the freedesktop runtime.
 
 ## Data
 

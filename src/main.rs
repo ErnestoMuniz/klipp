@@ -86,6 +86,19 @@ fn handle_tray_event(
 /// Bootstrap fino: monta services do backend + estado compartilhado,
 /// depois entrega o resto para o frontend (GPUI).
 fn main() {
+    let cli = crate::backend::ipc::parse_cli(std::env::args().skip(1));
+    if cli.help {
+        print!("{}", crate::backend::ipc::HELP);
+        return;
+    }
+    if cli.version {
+        println!("klipp {}", env!("CARGO_PKG_VERSION"));
+        return;
+    }
+    if let Some(bad) = cli.invalid {
+        eprintln!("opção desconhecida: {bad}\n{}", crate::backend::ipc::HELP);
+        std::process::exit(1);
+    }
     // Spans internos do GPUI (`sum_tree::seek_internal` etc.) disparam a cada
     // layout — com repaint a 15fps viram spam infinito. Silencia alvos barulhentos.
     env_logger::Builder::from_env(env_logger::Env::default().default_filter_or(
@@ -99,6 +112,21 @@ fn main() {
     let settings = core::settings::load();
     let shared = Arc::new(Mutex::new(Shared::new(&settings)));
 
+    // Instância única: segunda invocação entrega o comando (toggle/show)
+    // e encerra — é assim que o atalho custom do DE alcança o processo.
+    if matches!(
+        crate::backend::ipc::ensure_single_instance(&shared, cli.command),
+        crate::backend::ipc::Instance::Secondary
+    ) {
+        return;
+    }
+    // Processo novo invocado direto com --toggle-overlay (ex. atalho sem
+    // instância rodando): sobe e já abre o seletor.
+    let boot_toggle = matches!(
+        cli.command,
+        Some(crate::backend::ipc::Command::ToggleOverlay)
+    );
+
     let (shared2, engine2, graph2, assets2) =
         (shared.clone(), engine.clone(), graph.clone(), assets.clone());
     application()
@@ -111,6 +139,9 @@ fn main() {
             // no menu do tray). Ver `MainWindow::request_close`.
             cx.set_quit_mode(QuitMode::Explicit);
             open_main_window(cx, &shared2, &engine2, &graph2, &assets2);
+            if boot_toggle {
+                crate::backend::overlay::open(&shared2);
+            }
             // Consome os pedidos do tray icon na UI thread (~10Hz).
             // (Executor de foreground: o futuro segura `AsyncApp`, que
             // não é `Send` e não pode ir ao executor de background.)

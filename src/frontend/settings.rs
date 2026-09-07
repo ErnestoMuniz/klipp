@@ -1,7 +1,7 @@
 use std::time::Duration;
 
 use open_gpui::{
-    div, px, Animation, AnimationExt, Context, FontWeight, IntoElement,
+    div, px, Animation, AnimationExt, Context, FocusHandle, FontWeight, IntoElement,
     ease_out_quint, prelude::*,
 };
 
@@ -14,7 +14,7 @@ use super::ui::icon_action_btn;
 /// Drawer lateral de settings (Image 2). Backdrop fecha ao clicar fora.
 impl MainWindow {
     pub(crate) fn settings_overlay(&self, cx: &mut Context<Self>) -> impl IntoElement {
-        let (open, closing, mic_pass, hear, run_in_background, mic_source, mic_sources, mic_open, shortcut, theme_pref, lang, lang_open, rebinding) = {
+        let (open, closing, mic_pass, hear, run_in_background, mic_source, mic_sources, mic_open, shortcut, shortcut_error, theme_pref, lang, lang_open, rebinding) = {
             let s = self.shared.lock().unwrap();
             (
                 s.settings_open,
@@ -26,6 +26,7 @@ impl MainWindow {
                 s.mic_sources.clone(),
                 s.mic_open,
                 s.shortcut.clone(),
+                s.shortcut_error.clone(),
                 s.theme.clone(),
                 s.lang.clone(),
                 s.lang_open,
@@ -100,7 +101,8 @@ impl MainWindow {
                                 .child(section_label(&t(&lang, "settings.lang_group")))
                                 .child(language_select(&lang, lang_open, cx))
                                 .child(section_label(&t(&lang, "settings.shortcut_group")))
-                                .child(shortcut_box(&lang, &shortcut, rebinding, cx))
+                                .child(shortcut_box(&lang, &shortcut, rebinding, &self.shortcut_focus, cx))
+                                .child(shortcut_error_note(shortcut_error))
                                 .child(
                                     div()
                                         .text_sm()
@@ -591,11 +593,16 @@ fn shortcut_box(
     lang: &str,
     shortcut: &str,
     rebinding: bool,
+    focus: &FocusHandle,
     cx: &mut Context<MainWindow>,
 ) -> impl IntoElement {
     div()
         .id("shortcut-box")
-        .on_click(cx.listener(|this, _e, _w, cx| this.rebind_shortcut(cx)),
+        .track_focus(focus)
+        .on_key_down(cx.listener(|this, event, window, cx| {
+            this.on_shortcut_record(event, window, cx)
+        }))
+        .on_click(cx.listener(|this, _e, window, cx| this.rebind_shortcut(window, cx)),
         )
         .flex()
         .items_center()
@@ -624,6 +631,14 @@ fn shortcut_box(
         } else {
             shortcut.to_string()
         })
+}
+
+/// Erro do atalho global, logo abaixo da caixa (contexto imediato).
+fn shortcut_error_note(err: Option<String>) -> impl IntoElement {
+    match err {
+        Some(msg) => div().text_sm().text_color(theme::danger()).child(msg),
+        None => div(),
+    }
 }
 
 fn discord_hint(lang: &str) -> impl IntoElement {

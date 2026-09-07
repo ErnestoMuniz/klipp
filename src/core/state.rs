@@ -39,6 +39,9 @@ pub struct Shared {
     pub playing: Option<String>,
     pub shortcut: String,
     pub shortcut_rebinding: bool,
+    /// Erro do atalho global: renderizado abaixo da caixa no settings
+    /// (não no banner geral, para ficar junto do contexto).
+    pub shortcut_error: Option<String>,
     pub mic: String,
     pub mic_source: String,
     /// Fontes reais para o seletor do drawer: (nome, descrição).
@@ -167,6 +170,7 @@ impl Shared {
             playing: None,
             shortcut: settings.shortcut.clone(),
             shortcut_rebinding: false,
+            shortcut_error: None,
             mic: "inicializando…".into(),
             mic_source: settings.mic_source.clone(),
             mic_sources: vec![],

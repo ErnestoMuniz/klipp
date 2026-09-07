@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+# AppRun do Klipp (AppImage, sem sandbox: acesso total ao host).
+# O runtime do AppImage monta o AppDir e define $APPDIR; o binário mora em
+# $APPDIR/usr/bin/klipp e a fonte emoji em $APPDIR/usr/share/klipp/fonts/
+# (ver `load_font_bytes` em src/frontend/emoji.rs).
+# Fallback para o dir do script permite rodar extraído (--appimage-extract).
+if [ -z "${APPDIR:-}" ]; then
+  APPDIR="$(dirname "$(readlink -f "$0")")"
+fi
+exec "$APPDIR/usr/bin/klipp" "$@"

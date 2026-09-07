@@ -1,6 +1,6 @@
 [package]
 name = "klipp"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2024"
 description = "Desktop soundboard with a quick overlay and virtual microphone routing."
 license = "GPL-3.0-only"
@@ -37,3 +37,6 @@ ksni = { version = "0.3.6", default-features = false, features = ["async-io"] }
 
 [profile.dev]
 opt-level = 1
+
+[dev-dependencies]
+async-io = "2"

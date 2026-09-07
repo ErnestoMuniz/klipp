@@ -111,12 +111,14 @@ fn en(key: &str) -> &'static str {
         "shortcut.portal_desc" => "Open the sound picker",
         "err.pick" => "File picker: {msg}",
         "err.pick_portal" => {
-            "File picker unavailable: portal requires app-id — run via Flatpak or scripts/dev-run.sh"
+            "File picker unavailable: portal requires app-id — use scripts/dev-run.sh for dev"
         }
         "err.sink" => "Failed to connect to sink: {msg}",
         "err.shortcut" => "Shortcut: {msg}",
+        "err.shortcut_taken" => "shortcut already in use — pick another combination",
+        "err.shortcut_invalid" => "unsupported combination",
         "err.shortcut_portal" => {
-            "Global shortcut unavailable: portal requires app-id — run via Flatpak or scripts/dev-run.sh"
+            "Global shortcut unavailable: portal requires app-id — bind the AppImage in your desktop's custom shortcuts"
         }
         "err.import_none" => "No valid audio files to import",
         "err.mic" => "Microphone: {msg}",
@@ -204,12 +206,14 @@ fn pt(key: &str) -> &'static str {
         "shortcut.portal_desc" => "Abrir o seletor de sons",
         "err.pick" => "Seletor de arquivos: {msg}",
         "err.pick_portal" => {
-            "Seletor indisponível: o portal exige app-id — rode via Flatpak ou scripts/dev-run.sh"
+            "Seletor indisponível: o portal exige app-id — use scripts/dev-run.sh no dev"
         }
         "err.sink" => "Falha ao conectar no sink: {msg}",
         "err.shortcut" => "Atalho: {msg}",
+        "err.shortcut_taken" => "atalho já em uso — escolha outra combinação",
+        "err.shortcut_invalid" => "combinação não suportada",
         "err.shortcut_portal" => {
-            "Atalho global indisponível: o portal exige app-id — rode via Flatpak ou scripts/dev-run.sh"
+            "Atalho global indisponível: o portal exige app-id — vincule o AppImage nos atalhos custom do sistema"
         }
         "err.import_none" => "Nenhum arquivo de áudio válido para importar",
         "err.mic" => "Microfone: {msg}",
@@ -232,6 +236,8 @@ mod tests {
             "err.pick_portal",
             "err.sink",
             "err.shortcut",
+            "err.shortcut_taken",
+            "err.shortcut_invalid",
             "err.shortcut_portal",
             "err.import_none",
             "err.mic",
