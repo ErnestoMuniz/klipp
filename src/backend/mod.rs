@@ -1,5 +1,6 @@
 pub mod audio_graph;
 pub mod decode;
+pub mod gnome_shortcuts;
 pub mod ipc;
 pub mod native_shortcuts;
 pub mod online;

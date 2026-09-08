@@ -313,12 +313,14 @@ impl MainWindow {
 
         // Escuta o atalho global (uma vez por processo: o `Shared` é
         // único, um segundo listener duplicaria os disparos). Nativo do
-        // KDE fora de sandbox (KGlobalAccel, sem portal); portal no
-        // sandbox ou em outros DEs. Mesmo padrão para tray e fs watcher.
+        // KDE fora de sandbox (KGlobalAccel, sem portal); custom via
+        // gsettings no GNOME; portal no sandbox ou em outros DEs.
+        // Mesmo padrão para tray e fs watcher.
         static SHORTCUTS_ONCE: std::sync::OnceLock<()> = std::sync::OnceLock::new();
         static TRAY_ONCE: std::sync::OnceLock<()> = std::sync::OnceLock::new();
         let shared_h = self.shared.clone();
         let native = crate::backend::native_shortcuts::using_native();
+        let gnome = !native && crate::backend::gnome_shortcuts::using_gnome();
         SHORTCUTS_ONCE.get_or_init(|| {
             if native {
                 let shared_n = shared_h.clone();
@@ -326,6 +328,18 @@ impl MainWindow {
                     .spawn(async move {
                         if let Err(err) = backend::native_shortcuts::run(shared_n).await {
                             log::warn!("atalho nativo indisponível: {err}");
+                        }
+                    })
+                    .detach();
+            } else if gnome {
+                // Sem loop: o atalho custom chama `klipp --toggle-overlay`,
+                // que chega via IPC. Aqui só sincroniza/instala o vínculo
+                // (modo toggle: pressionar abre, pressionar de novo fecha).
+                let shared_g = shared_h.clone();
+                cx.background_executor()
+                    .spawn(async move {
+                        if let Err(err) = backend::gnome_shortcuts::run(shared_g).await {
+                            log::warn!("atalho gnome indisponível: {err}");
                         }
                     })
                     .detach();
@@ -1008,9 +1022,9 @@ impl MainWindow {
         }
     }
 
-    /// Botão do atalho: no nativo (KDE) entra em modo de gravação (a
-    /// próxima combinação pressionada vira o atalho); no portal, reabre
-    /// o popup de escolha do sistema.
+    /// Botão do atalho: no nativo (KDE) e no custom (GNOME) entra em
+    /// modo de gravação (a próxima combinação pressionada vira o atalho);
+    /// no portal, reabre o popup de escolha do sistema.
     pub(crate) fn rebind_shortcut(
         &self,
         window: &mut Window,
@@ -1019,7 +1033,9 @@ impl MainWindow {
         if self.shared.lock().unwrap().shortcut_rebinding {
             return;
         }
-        if crate::backend::native_shortcuts::using_native() {
+        if crate::backend::native_shortcuts::using_native()
+            || crate::backend::gnome_shortcuts::using_gnome()
+        {
             let mut s = self.shared.lock().unwrap();
             s.shortcut_rebinding = true;
             s.shortcut_error = None;
@@ -1077,7 +1093,7 @@ impl MainWindow {
             self.record_failed("invalid", window, cx);
             return;
         };
-        // Exibe na hora; o D-Bus confirma em background (o poller repinta).
+        // Exibe na hora; o D-Bus/gsettings confirma em background (o poller repinta).
         {
             let mut s = self.shared.lock().unwrap();
             s.shortcut = spec.clone();
@@ -1086,20 +1102,32 @@ impl MainWindow {
         cx.notify();
         window.blur();
         let shared = self.shared.clone();
+        // Mesma prioridade do spawn (nativo > gnome > portal).
+        let gnome = !crate::backend::native_shortcuts::using_native()
+            && crate::backend::gnome_shortcuts::using_gnome();
         cx.background_executor()
             .spawn(async move {
-                match crate::backend::native_shortcuts::set_shortcut(&shared, &spec).await {
+                let result = if gnome {
+                    crate::backend::gnome_shortcuts::set_shortcut(&shared, &spec).await
+                } else {
+                    crate::backend::native_shortcuts::set_shortcut(&shared, &spec).await
+                };
+                match result {
                     Ok(_) => {
                         shared.lock().unwrap().shortcut_error = None;
                     }
                     Err(err) => {
-                        let kind = err.to_string();
                         let mut s = shared.lock().unwrap();
                         let lang = s.lang.clone();
-                        s.shortcut_error = Some(if kind.contains("taken") {
-                            t(&lang, "err.shortcut_taken")
+                        s.shortcut_error = Some(if gnome {
+                            crate::backend::gnome_shortcuts::gnome_error(&lang, &err)
                         } else {
-                            t(&lang, "err.shortcut_invalid")
+                            let kind = err.to_string();
+                            if kind.contains("taken") {
+                                t(&lang, "err.shortcut_taken")
+                            } else {
+                                t(&lang, "err.shortcut_invalid")
+                            }
                         });
                     }
                 }

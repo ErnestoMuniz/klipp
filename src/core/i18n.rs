@@ -120,6 +120,9 @@ fn en(key: &str) -> &'static str {
         "err.shortcut_portal" => {
             "Global shortcut unavailable: portal requires app-id — bind the AppImage in your desktop's custom shortcuts"
         }
+        "err.shortcut_gnome" => {
+            "GNOME shortcut: {msg} — add it manually in Settings → Keyboard → Custom Shortcuts with command {cmd}"
+        }
         "err.import_none" => "No valid audio files to import",
         "err.mic" => "Microphone: {msg}",
         _ => "",
@@ -215,6 +218,9 @@ fn pt(key: &str) -> &'static str {
         "err.shortcut_portal" => {
             "Atalho global indisponível: o portal exige app-id — vincule o AppImage nos atalhos custom do sistema"
         }
+        "err.shortcut_gnome" => {
+            "Atalho do GNOME: {msg} — adicione à mão em Configurações → Teclado → Atalhos personalizados com o comando {cmd}"
+        }
         "err.import_none" => "Nenhum arquivo de áudio válido para importar",
         "err.mic" => "Microfone: {msg}",
         _ => "",
@@ -239,6 +245,7 @@ mod tests {
             "err.shortcut_taken",
             "err.shortcut_invalid",
             "err.shortcut_portal",
+            "err.shortcut_gnome",
             "err.import_none",
             "err.mic",
             "browse.downloading",
@@ -250,7 +257,13 @@ mod tests {
         }
         // Placeholders preservados na tradução.
         let msg = "x";
-        for key in ["err.pick", "err.sink", "err.shortcut", "err.mic"] {
+        for key in [
+            "err.pick",
+            "err.sink",
+            "err.shortcut",
+            "err.mic",
+            "err.shortcut_gnome",
+        ] {
             for lang in ["en", "pt-BR"] {
                 assert!(
                     super::t_fmt(lang, key, &[("msg", msg)]).contains(msg),

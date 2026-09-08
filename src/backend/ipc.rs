@@ -30,7 +30,8 @@ pub const HELP: &str = "Klipp — desktop soundboard\n\
     Opções:\n  \
       --toggle-overlay   Abre o overlay no cursor (ou confirma, se aberto).\n                         \
     Para atalho global, amarre esta flag num atalho custom do DE\n                         \
-    (KDE: Settings → Shortcuts → Add New → Command/URL).\n  \
+    (KDE: Settings → Shortcuts → Add New → Command/URL; GNOME: o app\n                         \
+    registra sozinho em Settings → Keyboard → Custom Shortcuts).\n  \
       --show               Traz a janela principal ao frente.\n  \
       -h, --help           Mostra esta ajuda.\n  \
       -V, --version        Mostra a versão.\n\
