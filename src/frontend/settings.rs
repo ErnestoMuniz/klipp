@@ -8,7 +8,7 @@ use open_gpui::{
 use super::icons::icon;
 use super::main_window::MainWindow;
 use super::theme;
-use crate::core::i18n::{t, t_fmt};
+use crate::core::i18n::t;
 use super::ui::icon_action_btn;
 
 /// Drawer lateral de settings (Image 2). Backdrop fecha ao clicar fora.
@@ -103,16 +103,6 @@ impl MainWindow {
                                 .child(section_label(&t(&lang, "settings.shortcut_group")))
                                 .child(shortcut_box(&lang, &shortcut, rebinding, &self.shortcut_focus, cx))
                                 .child(shortcut_error_note(shortcut_error))
-                                .child(
-                                    div()
-                                        .text_sm()
-                                        .text_color(theme::muted())
-                                        .child(t_fmt(
-                                            &lang,
-                                            "settings.shortcut_hint",
-                                            &[("shortcut", &shortcut)],
-                                        )),
-                                )
                                 .child(section_label(&t(&lang, "settings.tray_group")))
                                 .child(self.switch_row(
                                     run_in_background,

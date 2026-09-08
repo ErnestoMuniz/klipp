@@ -19,6 +19,27 @@ pub struct Sound {
     pub emoji: String,
 }
 
+/// Estado da extensão companion do cursor (GNOME Wayland): o pie só
+/// abre exato no cursor com ela ativa; sem ela, abre no centro e se
+/// corrige no primeiro movimento do mouse (ver `backend::cursor`).
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Default)]
+pub enum CursorExt {
+    /// Ainda não sondado (abre as settings sonda em background).
+    #[default]
+    Unknown,
+    /// Bridge D-Bus no ar (`org.mousecoords.Bridge` ou wdotool).
+    Active,
+    /// Copiada para `~/.local/...`, mas a Shell ainda não a viu: falta
+    /// sair e entrar de novo (a Shell só lista extensões no login).
+    NeedsLogin,
+    /// A Shell lista, mas está desabilitada: basta habilitar.
+    Disabled,
+    /// Sem extensão: pie abre no centro (fallback).
+    Missing,
+    /// Instalação em curso (botão desabilitado).
+    Installing,
+}
+
 /// Resultado de busca online (MyInstants): nada em disco até baixar.
 #[derive(Clone, Debug)]
 pub struct OnlineSound {
@@ -39,6 +60,19 @@ pub struct Shared {
     pub playing: Option<String>,
     pub shortcut: String,
     pub shortcut_rebinding: bool,
+    /// Estado da extensão companion do cursor (sondado na largada).
+    pub cursor_ext: CursorExt,
+    /// Dialog de setup do cursor (GNOME): abre sozinho na largada quando
+    /// a extensão não está ativa.
+    pub cursor_prompt_open: bool,
+    /// Fechando: overlay continua montado tocando o fade reverso.
+    pub cursor_prompt_closing: bool,
+    pub cursor_prompt_anim_start: u128,
+    /// Dialog já exibido neste processo (não reabre ao fechar).
+    pub cursor_prompt_shown: bool,
+    /// Última re-sondagem da extensão (ms): o estado pode mudar fora do
+    /// app (habilitar no terminal, login), então re-sonda periódico.
+    pub cursor_probe_ms: u128,
     /// Erro do atalho global: renderizado abaixo da caixa no settings
     /// (não no banner geral, para ficar junto do contexto).
     pub shortcut_error: Option<String>,
@@ -170,6 +204,12 @@ impl Shared {
             playing: None,
             shortcut: settings.shortcut.clone(),
             shortcut_rebinding: false,
+            cursor_ext: CursorExt::Unknown,
+            cursor_prompt_open: false,
+            cursor_prompt_closing: false,
+            cursor_prompt_anim_start: 0,
+            cursor_prompt_shown: false,
+            cursor_probe_ms: 0,
             shortcut_error: None,
             mic: "inicializando…".into(),
             mic_source: settings.mic_source.clone(),

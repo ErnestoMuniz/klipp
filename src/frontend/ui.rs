@@ -102,7 +102,77 @@ pub(crate) fn hint_banner(
         .into_any_element()
 }
 
-/// Faixa vermelha de erro do backend.
+/// Faixa persistente do cursor (só GNOME, só sem extensão ativa): sem X
+/// de propósito — some sozinha quando a extensão ativa. No `Disabled` tem
+/// botão Habilitar; no `NeedsLogin`, a instrução de sair/entrar.
+pub(crate) fn cursor_banner(
+    lang: &str,
+    status: crate::core::state::CursorExt,
+    cx: &mut Context<MainWindow>,
+) -> impl IntoElement {
+    use crate::core::state::CursorExt as C;
+    if !crate::backend::gnome_shortcuts::is_desktop_gnome() {
+        return div().into_any_element();
+    }
+    let enable: Option<open_gpui::AnyElement> = match status {
+        C::Disabled => Some(
+            div()
+                .id("cursor-banner-enable")
+                .on_click(cx.listener(|this, _e, _w, cx| {
+                    cx.stop_propagation();
+                    this.enable_cursor_extension(cx)
+                }))
+                .px_3()
+                .py_1()
+                .bg(theme::accent())
+                .hover(|s| s.bg(theme::accent()))
+                .rounded(px(6.0))
+                .cursor_pointer()
+                .text_xs()
+                .font_weight(open_gpui::FontWeight::SEMIBOLD)
+                .text_color(open_gpui::rgb(0xf2f8ff))
+                .child(t(lang, "cursor.enable"))
+                .into_any_element(),
+        ),
+        _ => None,
+    };
+    let text_key = match status {
+        C::NeedsLogin => Some("cursor.banner_login"),
+        C::Disabled => Some("cursor.banner_disabled"),
+        _ => None,
+    };
+    let Some(text_key) = text_key else {
+        return div().into_any_element();
+    };
+    let mut row = div()
+        .flex_1()
+        .flex()
+        .items_center()
+        .gap_2()
+        .text_sm()
+        .child(t(lang, text_key));
+    if let Some(enable) = enable {
+        row = row.child(enable);
+    }
+    div()
+        .mx_4()
+        .mt_1()
+        .mb_2()
+        .px_4()
+        .py_2()
+        .flex()
+        .items_center()
+        .gap_2()
+        .bg(theme::hint_bg())
+        .border_1()
+        .border_dashed()
+        .border_color(theme::hint_border())
+        .rounded(px(10.0))
+        .child(icon("lucide-command", 14.0, theme::accent()))
+        .child(row)
+        .into_any_element()
+}
+
 pub(crate) fn status_banner(last_error: Option<String>) -> impl IntoElement {
     match last_error {
         Some(err) => div()

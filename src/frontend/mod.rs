@@ -1,6 +1,7 @@
 pub mod about;
 pub mod assets;
 pub mod browse;
+pub mod cursor_setup;
 pub mod editor;
 pub mod emoji;
 pub mod format;

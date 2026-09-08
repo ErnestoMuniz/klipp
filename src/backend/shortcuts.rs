@@ -259,6 +259,18 @@ fn friendly_portal_error(lang: &str, err: &anyhow::Error) -> String {
     let msg = err.to_string();
     if msg.contains("An app id is required") {
         t(lang, "err.shortcut_portal")
+    } else if crate::backend::gnome_shortcuts::is_desktop_gnome() {
+        // No GNOME o caminho suportado fora do sandbox é o atalho custom
+        // (ver `backend::gnome_shortcuts`): o erro do portal aqui vira
+        // instrução acionável em vez de "Atalho: ..." cru.
+        t_fmt(
+            lang,
+            "err.shortcut_gnome",
+            &[
+                ("msg", &msg),
+                ("cmd", &crate::backend::gnome_shortcuts::toggle_command()),
+            ],
+        )
     } else {
         t_fmt(lang, "err.shortcut", &[("msg", &msg)])
     }

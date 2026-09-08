@@ -45,6 +45,11 @@ install -m0644 "$PKG_DIR/$APP_ID.desktop" "$APPDIR/$APP_ID.desktop"
 install -m0644 "$PKG_DIR/$APP_ID.desktop" "$APPDIR/usr/share/applications/$APP_ID.desktop"
 install -m0644 "$PKG_DIR/$APP_ID.metainfo.xml" "$APPDIR/usr/share/metainfo/$APP_ID.metainfo.xml"
 install -m0644 "$APP_DIR/assets/fonts/NotoColorEmoji.ttf" "$APPDIR/usr/share/klipp/fonts/NotoColorEmoji.ttf"
+# Extensão companion do cursor (GNOME Wayland): o app instala com 1 clique
+# (ver backend::cursor) — aqui só embarca os arquivos junto ao binário.
+mkdir -p "$APPDIR/usr/share/klipp/gnome-extension"
+cp -r "$PKG_DIR/gnome-extension/mousecoords@mouse-coords.github.io" \
+  "$APPDIR/usr/share/klipp/gnome-extension/"
 for s in 16 32 48 64 128 256 512; do
   dest="$APPDIR/usr/share/icons/hicolor/${s}x${s}/apps"
   mkdir -p "$dest"
@@ -72,3 +77,4 @@ ls -la "$OUT" "$OUT_DIR"/Klipp-*.zsync 2>/dev/null || true
 echo "==> ok: $OUT"
 echo "    rode: ./$(basename "$OUT")"
 echo "    atalho global no KDE: Settings do app -> Atalho global (nativo, sem portal)"
+echo "    atalho global no GNOME: o app registra sozinho o atalho custom (gsettings)"

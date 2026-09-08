@@ -15,7 +15,7 @@ use super::library::{drop_overlay, empty_library, no_results};
 use super::overlay::OverlayEntity;
 use super::theme;
 use super::titlebar::titlebar;
-use super::ui::{hint_banner, status_banner};
+use super::ui::{cursor_banner, hint_banner, status_banner};
 use crate::backend::{self, AudioGraph, Engine};
 use crate::core::i18n::{t, t_fmt};
 use crate::core::state::{Shared, Sound};
@@ -56,6 +56,9 @@ pub struct MainWindow {
     pub(crate) shortcut_focus: FocusHandle,
     /// Card sob o mouse (para revelar as ações). Estado local da view.
     pub(crate) hovered_card: Option<usize>,
+    /// Modo fallback (sem layer-shell): janelas criadas ao ativar e
+    /// destruídas ao fechar, em vez de persistentes.
+    overlay_fallback: bool,
     /// Arrastar no slider de volume: botão segurado após pressionar a trilha.
     vol_dragging: bool,
     /// Retângulo da trilha do slider (medido a cada frame): permite mapear
@@ -86,7 +89,7 @@ impl MainWindow {
         let overlays = Arc::new(Mutex::new(Vec::new()));
         let overlay_ids = Arc::new(Mutex::new(Vec::new()));
 
-        let entity = Self {
+        let mut entity = Self {
             shared: shared.clone(),
             engine,
             graph,
@@ -106,11 +109,14 @@ impl MainWindow {
             last_ver: 1,
             last_overlay_active: false,
             close_hooked: false,
+            // Sem layer-shell (ex. GNOME/Mutter): janelas sob demanda —
+            // janela nova mapeia no topo; persistente 1x1 ficava para trás.
+            overlay_fallback: false,
         };
 
-        // Um overlay fullscreen por display: o compositor fixa cada surface
-        // layer-shell num output — overlay único ficava preso no monitor
-        // errado sem receber o mouse do outro. 1x1 (invisível) até ativar.
+        // Com layer-shell (KDE...), um overlay persistente por display. Sem
+        // layer-shell o `ensure_overlays` liga o modo fallback (janelas
+        // criadas a cada ativação, destruídas ao fechar).
         // `ensure_overlays` (no tick) completa monitores que aparecem depois
         // (a enumeração Wayland pode chegar incompleta na largada).
         entity.ensure_overlays(cx);
@@ -121,11 +127,18 @@ impl MainWindow {
         entity
     }
 
-    /// Garante um overlay por display (idempotente e silencioso quando
-    /// estável): cria só para displays sem janela e fecha janelas obsoletas
-    /// (ex. a transitória `None` da largada, quando a enumeração Wayland
-    /// ainda estava vazia).
-    fn ensure_overlays(&self, cx: &mut Context<Self>) {
+    /// Garante um overlay layer-shell por display (idempotente e silencioso
+    /// quando estável): cria só para displays sem janela e fecha janelas
+    /// obsoletas (ex. a transitória `None` da largada, quando a enumeração
+    /// Wayland ainda estava vazia).
+    ///
+    /// Sem layer-shell (GNOME/Mutter) liga o modo fallback e retorna: as
+    /// janelas são criadas a cada ativação (mapear = topo garantido) e
+    /// destruídas ao fechar (ver `sync_fallback_overlays` no tick).
+    fn ensure_overlays(&mut self, cx: &mut Context<Self>) {
+        if self.overlay_fallback {
+            return;
+        }
         use std::collections::HashSet;
         let displays = cx.displays();
         // Sem displays (enumeração ainda vazia): tenta de novo no próximo
@@ -173,7 +186,7 @@ impl MainWindow {
         }
         for target in missing {
             let is_fallback = target == primary_id || (primary_id.is_none() && target.is_none());
-            if Self::open_overlay(
+            if Self::open_overlay_layer(
                 self.overlay.clone(),
                 self.overlay_ids.clone(),
                 self.shared.clone(),
@@ -183,14 +196,20 @@ impl MainWindow {
             )
             .is_err()
             {
+                // Sem layer-shell e sem nenhuma janela: modo fallback
+                // (falha parcial com janelas vivas segue no modo layer).
+                if self.overlay.lock().unwrap().is_empty() {
+                    log::info!("overlay: sem layer-shell, modo fallback (sob demanda)");
+                    self.overlay_fallback = true;
+                }
                 break;
             }
         }
     }
 
-    /// Abre uma janela de overlay para `target` e registra em `overlays`.
-    /// Retorna `Err` se nem LayerShell nem o fallback PopUp abriram.
-    fn open_overlay(
+    /// Abre uma janela de overlay layer-shell para `target` e registra em
+    /// `overlays`. Retorna `Err` sem layer-shell (modo fallback).
+    fn open_overlay_layer(
         overlays: Arc<Mutex<Vec<(WindowHandle<OverlayEntity>, Option<open_gpui::DisplayId>)>>>,
         overlay_ids: Arc<Mutex<Vec<open_gpui::EntityId>>>,
         shared: Arc<Mutex<Shared>>,
@@ -199,12 +218,14 @@ impl MainWindow {
         cx: &mut Context<Self>,
     ) -> anyhow::Result<()> {
         let shared_layer = shared.clone();
-        let shared_popup = shared.clone();
         let ids_layer = overlay_ids.clone();
-        let ids_popup = overlay_ids.clone();
         let layer_opts = default_layer_shell_options();
         cx.open_window(
-            overlay_options(WindowKind::LayerShell(layer_opts), target),
+            overlay_options(
+                WindowKind::LayerShell(layer_opts),
+                target,
+                size(px(1.0), px(1.0)),
+            ),
             move |_window, cx| {
                 let e = cx.new(|cx| {
                     OverlayEntity::new(
@@ -222,30 +243,51 @@ impl MainWindow {
                 e
             },
         )
-        .or_else(|_| {
-            // Compositor sem LayerShell: cai para uma janela xdg normal (PopUp).
-            cx.open_window(
-                overlay_options(WindowKind::PopUp, target),
-                move |_window, cx| {
-                    let e = cx.new(|cx| {
-                        OverlayEntity::new(
-                            shared_popup.clone(),
-                            ids_popup.clone(),
-                            target,
-                            is_fallback,
-                            cx,
-                        )
-                    });
-                    let mut ids = ids_popup.lock().unwrap();
-                    if !ids.contains(&e.entity_id()) {
-                        ids.push(e.entity_id());
-                    }
-                    e
-                },
-            )
-        })
         .map(|handle| {
             log::info!("overlay: janela criada para display {target:?}");
+            overlays.lock().unwrap().push((handle, target))
+        })
+        .map_err(|err| {
+            log::warn!("não foi possível criar a janela de overlay ({target:?}): {err}");
+            anyhow::anyhow!("{err}")
+        })
+    }
+
+    /// Abre uma janela de overlay fallback (toplevel comum, sem layer-shell)
+    /// para `target`, já no tamanho final de `bounds`. Usada sob demanda a
+    /// cada ativação: janela nova mapeia no topo do compositor.
+    fn open_overlay_popup(
+        overlays: Arc<Mutex<Vec<(WindowHandle<OverlayEntity>, Option<open_gpui::DisplayId>)>>>,
+        overlay_ids: Arc<Mutex<Vec<open_gpui::EntityId>>>,
+        shared: Arc<Mutex<Shared>>,
+        target: Option<open_gpui::DisplayId>,
+        is_fallback: bool,
+        bounds: open_gpui::Bounds<open_gpui::Pixels>,
+        cx: &mut Context<Self>,
+    ) -> anyhow::Result<()> {
+        let shared_popup = shared.clone();
+        let ids_popup = overlay_ids.clone();
+        cx.open_window(
+            overlay_options(WindowKind::PopUp, target, bounds.size),
+            move |_window, cx| {
+                let e = cx.new(|cx| {
+                    OverlayEntity::new(
+                        shared_popup.clone(),
+                        ids_popup.clone(),
+                        target,
+                        is_fallback,
+                        cx,
+                    )
+                });
+                let mut ids = ids_popup.lock().unwrap();
+                if !ids.contains(&e.entity_id()) {
+                    ids.push(e.entity_id());
+                }
+                e
+            },
+        )
+        .map(|handle| {
+            log::info!("overlay: janela fallback criada para display {target:?}");
             overlays.lock().unwrap().push((handle, target))
         })
         .map_err(|err| {
@@ -362,6 +404,8 @@ impl MainWindow {
                 })
                 .detach();
         });
+        // Setup explícito do cursor (só GNOME, uma vez por processo).
+        self.probe_cursor_setup(cx);
     }
 
     fn spawn_poller(&self, cx: &mut Context<Self>) {
@@ -397,6 +441,35 @@ impl MainWindow {
         self.ensure_overlays(cx);
         // Âncora exata (thread) e hover: sincroniza as janelas de overlay.
         self.sync_overlay_windows(cx);
+        // Re-sonda a extensão do cursor a cada 30s (só GNOME, só se não
+        // ativa): o estado muda fora do app — habilitar no terminal,
+        // login — e os alerts acompanham sozinhos.
+        if crate::backend::gnome_shortcuts::is_desktop_gnome() {
+            let due = {
+                let s = self.shared.lock().unwrap();
+                s.cursor_ext != crate::core::state::CursorExt::Active
+                    && super::format::now_ms().saturating_sub(s.cursor_probe_ms) >= 30_000
+            };
+            if due {
+                self.shared.lock().unwrap().cursor_probe_ms = super::format::now_ms();
+                let shared = self.shared.clone();
+                cx.background_executor()
+                    .spawn(async move {
+                        let status = crate::backend::cursor::status();
+                        let mut s = shared.lock().unwrap();
+                        if s.cursor_ext != status {
+                            s.cursor_ext = status;
+                            // Ativou no meio do caminho: fecha o dialog.
+                            if status == crate::core::state::CursorExt::Active {
+                                s.cursor_prompt_open = false;
+                                s.cursor_prompt_closing = false;
+                            }
+                            s.bump();
+                        }
+                    })
+                    .detach();
+            }
+        }
         // Pedido de play fora do guard: `Engine::play` publica a época no
         // `Shared` de forma síncrona (travar aqui = deadlock na UI thread).
         let play_now: Option<Sound> = {
@@ -446,6 +519,7 @@ impl MainWindow {
         }
 
         let overlay_active = s.overlay_active;
+        let overlay_fading = s.overlay_fading;
         let version = s.version;
         // Arrastar arquivos externos: reflete no overlay via poll (~15fps).
         let ext_drag = cx.active_drag_value::<open_gpui::ExternalPaths>().is_some();
@@ -462,6 +536,7 @@ impl MainWindow {
             || s.settings_closing
             || s.browse_closing
             || s.about_closing
+            || s.cursor_prompt_closing
             || s.editor_closing;
         // Fim da animação de saída do drawer: desmonta.
         if s.settings_closing
@@ -481,6 +556,13 @@ impl MainWindow {
         if s.about_closing && super::format::now_ms().saturating_sub(s.about_anim_start) >= 200 {
             s.about_open = false;
             s.about_closing = false;
+            s.bump();
+        }
+        if s.cursor_prompt_closing
+            && super::format::now_ms().saturating_sub(s.cursor_prompt_anim_start) >= 200
+        {
+            s.cursor_prompt_open = false;
+            s.cursor_prompt_closing = false;
             s.bump();
         }
         if s.editor_closing && super::format::now_ms().saturating_sub(s.editor_anim_start) >= 200 {
@@ -503,6 +585,11 @@ impl MainWindow {
         }
         drop(s);
 
+        // Sem layer-shell: janelas sob demanda (cria ao ativar, destrói
+        // após o fade). Tem que vir antes do `resize_overlay` abaixo, que
+        // ativa as entidades das janelas recém-criadas.
+        self.sync_fallback_overlays(cx, overlay_active, overlay_fading);
+
         if overlay_active != self.last_overlay_active {
             self.last_overlay_active = overlay_active;
             self.resize_overlay(cx, overlay_active);
@@ -516,41 +603,80 @@ impl MainWindow {
         }
     }
 
-    /// Sincroniza as janelas de overlay enquanto ativo: confirma a âncora
-    /// via hover quando pendente e repinta todas (a âncora exata chega por
-    /// thread dedicada, fora do ciclo de repaint das janelas).
+    /// Sincroniza as janelas de overlay enquanto ativo: repinta todas
+    /// (a âncora exata chega pela thread do cursor ou pelo primeiro
+    /// mouse_move real — ver `backend::overlay` e `on_pointer_move`).
+    ///
+    /// NÃO confirma a âncora por `is_mouse_in_window()` aqui: o flag vira
+    /// true no pointer-enter, mas `mouse_position()` só atualiza no
+    /// primeiro evento real de movimento — cursor parado lia (0,0)
+    /// obsoleto e grudava o pie no canto sem volta (o flag de confirmação
+    /// já tinha limpado). Sem âncora, o render mostra o fallback no
+    /// centro até o primeiro movimento corrigir.
     fn sync_overlay_windows(&self, cx: &mut Context<Self>) {
         if !self.shared.lock().unwrap().overlay_active {
             return;
         }
-        let needs = self.shared.lock().unwrap().anchor_needs_confirm;
-        let origins: std::collections::HashMap<Option<open_gpui::DisplayId>, (f32, f32)> = cx
-            .displays()
-            .iter()
-            .map(|d| {
-                let o = d.bounds().origin;
-                (Some(d.id()), (f32::from(o.x), f32::from(o.y)))
-            })
-            .collect();
-        let shared = self.shared.clone();
-        for (handle, target) in self.overlay.lock().unwrap().iter() {
-            let origin = origins.get(target).copied();
-            let _ = handle.update(cx, |_, window, cx| {
-                if needs {
-                    if let Some((ox, oy)) = origin {
-                        if window.is_mouse_in_window() {
-                            let p = window.mouse_position();
-                            let pos = (f32::from(p.x) + ox, f32::from(p.y) + oy);
-                            let mut s = shared.lock().unwrap();
-                            s.anchor_needs_confirm = false;
-                            s.overlay_anchor = Some(pos);
-                            s.bump();
-                            log::info!("overlay âncora (hover): ({:.0}, {:.0})", pos.0, pos.1);
-                        }
-                    }
-                }
+        for (handle, _) in self.overlay.lock().unwrap().iter() {
+            let _ = handle.update(cx, |_, _, cx| {
                 cx.notify();
             });
+        }
+    }
+
+    /// Modo fallback (sem layer-shell): cria as janelas ao ativar (janela
+    /// nova mapeia no topo do compositor — ordem determinística) e destrói
+    /// após o fade de saída. No modo layer-shell não faz nada (janelas
+    /// persistentes do `ensure_overlays`).
+    fn sync_fallback_overlays(&self, cx: &mut Context<Self>, active: bool, fading: bool) {
+        if !self.overlay_fallback {
+            return;
+        }
+        if active {
+            if !self.overlay.lock().unwrap().is_empty() {
+                return;
+            }
+            let displays = cx.displays();
+            if displays.is_empty() {
+                return;
+            }
+            let primary_id = cx
+                .primary_display()
+                .map(|d| d.id())
+                .or_else(|| displays.first().map(|d| d.id()));
+            log::info!(
+                "overlay: criando janelas fallback ({} display(s))",
+                displays.len()
+            );
+            for d in &displays {
+                let target = Some(d.id());
+                let is_fallback =
+                    target == primary_id || (primary_id.is_none() && target.is_none());
+                if Self::open_overlay_popup(
+                    self.overlay.clone(),
+                    self.overlay_ids.clone(),
+                    self.shared.clone(),
+                    target,
+                    is_fallback,
+                    d.bounds(),
+                    cx,
+                )
+                .is_err()
+                {
+                    break;
+                }
+            }
+        } else if !fading && !self.overlay.lock().unwrap().is_empty() {
+            let handles: Vec<WindowHandle<OverlayEntity>> =
+                std::mem::take(&mut *self.overlay.lock().unwrap())
+                    .into_iter()
+                    .map(|(h, _)| h)
+                    .collect();
+            for handle in handles {
+                let _ = handle.update(cx, |_, window, _| window.remove_window());
+            }
+            self.overlay_ids.lock().unwrap().clear();
+            log::info!("overlay: janelas fallback destruídas");
         }
     }
 
@@ -573,10 +699,6 @@ impl MainWindow {
             let size = bounds
                 .map(|b| b.size)
                 .unwrap_or(open_gpui::size(px(1.0), px(1.0)));
-            // Origem real do display (window.bounds() de layer-shell mente:
-            // sempre 1x1@(0,0)).
-            let origin = bounds.map(|b| b.origin);
-            let shared = self.shared.clone();
             let _ = handle.update(cx, |this, window, cx| {
                 window.resize(size);
                 if active {
@@ -584,23 +706,11 @@ impl MainWindow {
                     // Sem activate_window: layer Overlay já fica no topo por
                     // protocolo, e pedir ativação só gera erro do backend
                     // ("activation token received with no pending activation").
-                    if window.is_mouse_in_window() {
-                        let mut s = shared.lock().unwrap();
-                        if s.overlay_anchor.is_none() {
-                            let p = window.mouse_position();
-                            let anchor = match origin {
-                                Some(o) => (
-                                    f32::from(p.x) + f32::from(o.x),
-                                    f32::from(p.y) + f32::from(o.y),
-                                ),
-                                None => (f32::from(p.x), f32::from(p.y)),
-                            };
-                            log::info!("overlay âncora (pré): ({:.0}, {:.0})", anchor.0, anchor.1);
-                            s.overlay_anchor = Some(anchor);
-                            s.anchor_needs_confirm = false;
-                            s.bump();
-                        }
-                    }
+                    //
+                    // Sem âncora via `is_mouse_in_window()` aqui pelo mesmo
+                    // motivo de `sync_overlay_windows`: cursor parado tem
+                    // `mouse_position()` (0,0) obsoleto. A âncora vem da
+                    // thread do cursor ou do primeiro mouse_move real.
                 }
                 this.set_active(active, cx);
             });
@@ -1163,6 +1273,105 @@ impl MainWindow {
         }
     }
 
+    /// Sonda a extensão do cursor na largada (só GNOME) e abre o dialog de
+    /// setup uma vez quando ela não está ativa. Sem ela o pie abre no
+    /// centro em vez de no cursor.
+    pub(crate) fn probe_cursor_setup(&self, cx: &mut Context<Self>) {
+        if !crate::backend::gnome_shortcuts::is_desktop_gnome() {
+            return;
+        }
+        let shared = self.shared.clone();
+        cx.background_executor()
+            .spawn(async move {
+                let status = crate::backend::cursor::status();
+                let mut s = shared.lock().unwrap();
+                let mut changed = false;
+                if s.cursor_ext != status {
+                    s.cursor_ext = status;
+                    changed = true;
+                }
+                if status != crate::core::state::CursorExt::Active
+                    && !s.cursor_prompt_shown
+                    && !s.cursor_prompt_open
+                {
+                    s.cursor_prompt_open = true;
+                    s.cursor_prompt_closing = false;
+                    s.cursor_prompt_shown = true;
+                    changed = true;
+                }
+                if changed {
+                    s.bump();
+                }
+            })
+            .detach();
+    }
+
+    /// Botão "Habilitar" (extensão instalada porém desativada): enable em
+    /// background; se ativar na hora, fecha o dialog.
+    pub(crate) fn enable_cursor_extension(&self, cx: &mut Context<Self>) {
+        {
+            let mut s = self.shared.lock().unwrap();
+            if s.cursor_ext == crate::core::state::CursorExt::Installing {
+                return;
+            }
+            s.cursor_ext = crate::core::state::CursorExt::Installing;
+            s.bump();
+        }
+        cx.notify();
+        let shared = self.shared.clone();
+        cx.background_executor()
+            .spawn(async move {
+                let status = match crate::backend::cursor::enable() {
+                    Ok(status) => status,
+                    Err(err) => {
+                        log::warn!("habilitar extensão do cursor: {err}");
+                        crate::backend::cursor::status()
+                    }
+                };
+                let mut s = shared.lock().unwrap();
+                s.cursor_ext = status;
+                if status == crate::core::state::CursorExt::Active {
+                    s.cursor_prompt_open = false;
+                    s.cursor_prompt_closing = false;
+                }
+                s.bump();
+            })
+            .detach();
+    }
+    /// Botão "Instalar extensão do cursor" (dialog de setup, GNOME):
+    /// copia + enable em background. Se ativar na hora, fecha o dialog
+    /// (senão ele mostra a instrução de logout/login).
+    pub(crate) fn install_cursor_extension(&self, cx: &mut Context<Self>) {
+        {
+            let mut s = self.shared.lock().unwrap();
+            if s.cursor_ext == crate::core::state::CursorExt::Installing {
+                return;
+            }
+            s.cursor_ext = crate::core::state::CursorExt::Installing;
+            s.bump();
+        }
+        cx.notify();
+        let shared = self.shared.clone();
+        cx.background_executor()
+            .spawn(async move {
+                let status = match crate::backend::cursor::install() {
+                    Ok(status) => status,
+                    Err(err) => {
+                        log::warn!("instalar extensão do cursor: {err}");
+                        crate::backend::cursor::status()
+                    }
+                };
+                let mut s = shared.lock().unwrap();
+                s.cursor_ext = status;
+                if status == crate::core::state::CursorExt::Active {
+                    s.cursor_prompt_open = false;
+                    s.cursor_prompt_closing = false;
+                }
+                s.bump();
+            })
+            .detach();
+    }
+
     pub(crate) fn set_mic_pass(&self, on: bool, cx: &mut Context<Self>) {
         let result = self.graph.lock().unwrap().set_mic_passthrough(on);
         let mut s = self.shared.lock().unwrap();
@@ -1371,12 +1580,16 @@ async fn maybe_autoplay(
     }
 }
 
-fn overlay_options(kind: WindowKind, display_id: Option<open_gpui::DisplayId>) -> WindowOptions {
+fn overlay_options(
+    kind: WindowKind,
+    display_id: Option<open_gpui::DisplayId>,
+    size: open_gpui::Size<open_gpui::Pixels>,
+) -> WindowOptions {
     WindowOptions {
         kind,
         window_bounds: Some(WindowBounds::Windowed(open_gpui::Bounds {
             origin: open_gpui::point(px(0.0), px(0.0)),
-            size: size(px(1.0), px(1.0)),
+            size,
         })),
         focus: false,
         show: true,
@@ -1449,6 +1662,8 @@ impl Render for MainWindow {
             about_open,
             browse_open,
             editor_open,
+            cursor_prompt_open,
+            cursor_ext,
             playback,
             play_peaks,
             play_paused,
@@ -1478,6 +1693,8 @@ impl Render for MainWindow {
                 shared.about_open,
                 shared.browse_open,
                 shared.editor_open,
+                shared.cursor_prompt_open,
+                shared.cursor_ext,
                 playback,
                 shared.play_peaks.clone(),
                 shared.play_paused,
@@ -1519,7 +1736,7 @@ impl Render for MainWindow {
                 playing.as_ref(),
                 compact,
                 &lang,
-                settings_open || about_open || browse_open || editor_open,
+                settings_open || about_open || browse_open || editor_open || cursor_prompt_open,
                 cx,
             )
             .into_any_element()
@@ -1581,6 +1798,7 @@ impl Render for MainWindow {
                 cx,
             ))
             .child(hint_banner(&lang, &shortcut, show_hint, cx))
+            .child(cursor_banner(&lang, cursor_ext, cx))
             .child(status_banner(last_error))
             .child(
                 div()
@@ -1613,6 +1831,7 @@ impl Render for MainWindow {
             .child(self.editor_dialog(cx))
             .child(drop_overlay(&lang, drop_active))
             .child(self.about_overlay(cx))
+            .child(self.cursor_prompt_overlay(cx))
             .child(drop_overlay(&lang, drop_active))
             .children(resize_handles(cx))
     }

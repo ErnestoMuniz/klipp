@@ -32,7 +32,7 @@ smallvec = "1"
 notify = "8"
 gpui-animation = { path = "vendor/gpui-animation" }
 ureq = { version = "2", features = ["json"] }
-mouse-coords = { path = "vendor/mouse-coords" }
+mouse-coords = "0.2"
 cosmic-text = "0.19"
 swash = "0.2"
 resvg = { version = "0.46", default-features = false, features = ["text", "system-fonts"] }

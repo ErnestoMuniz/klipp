@@ -3314,7 +3314,9 @@ dependencies = [
 
 [[package]]
 name = "mouse-coords"
-version = "0.1.0"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9d5de9c7baf8f4376c1adaeb64e464004a2b63225b9871a4d72796f4e00093c4"
 dependencies = [
  "core-graphics 0.23.2",
  "tempfile",
