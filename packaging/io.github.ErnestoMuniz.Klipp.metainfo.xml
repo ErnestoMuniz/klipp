@@ -38,6 +38,11 @@
   </developer>
   <content_rating type="oars-1.1" />
   <releases>
+    <release version="0.3.2" date="2026-09-09">
+      <description>
+        <p>Atualizador interno no app com verificação automática e correção do arrasto de volume/progresso no player.</p>
+      </description>
+    </release>
     <release version="0.3.0" date="2026-09-08">
       <description>
         <p>Atalho global automático no GNOME (atalho custom do sistema), extensão companion do cursor com instalação em 1 clique, overlay sob demanda e mouse-coords 0.2.</p>

@@ -1,6 +1,6 @@
 [package]
 name = "klipp"
-version = "0.3.0"
+version = "0.3.2"
 edition = "2024"
 description = "Desktop soundboard with a quick overlay and virtual microphone routing."
 license = "GPL-3.0-only"
