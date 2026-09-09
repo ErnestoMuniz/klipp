@@ -1776,6 +1776,15 @@ impl Render for MainWindow {
                     this.end_progress_drag();
                 }),
             )
+            // Fallback: soltar fora da janela com arrasto iniciado no
+            // slider (os sliders já tratam o release dentro da janela).
+            .on_mouse_up_out(
+                MouseButton::Left,
+                cx.listener(|this, _event, _window, _cx| {
+                    this.end_vol_drag();
+                    this.end_progress_drag();
+                }),
+            )
             .on_drop(
                 cx.listener(|this, paths: &open_gpui::ExternalPaths, _window, cx| {
                     this.import_dropped(paths.paths(), cx);

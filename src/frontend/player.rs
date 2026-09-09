@@ -236,6 +236,35 @@ impl MainWindow {
                                                 },
                                             ),
                                         )
+                                        // O `on_mouse_up` da raiz não dispara com o
+                                        // release sobre o player (o `.occlude()` da
+                                        // barra tira a raiz do hit-test): sem isso o
+                                        // `vol_dragging` ficava preso e o slider
+                                        // seguia o mouse até outro clique fora.
+                                        .on_mouse_move(cx.listener(
+                                            |this, event: &open_gpui::MouseMoveEvent, _window, cx| {
+                                                this.on_vol_move(
+                                                    f32::from(event.position.x),
+                                                    cx,
+                                                );
+                                            },
+                                        ))
+                                        .on_mouse_up(
+                                            MouseButton::Left,
+                                            cx.listener(
+                                                |this, _event: &open_gpui::MouseUpEvent, _window, _cx| {
+                                                    this.end_vol_drag();
+                                                },
+                                            ),
+                                        )
+                                        .on_mouse_up_out(
+                                            MouseButton::Left,
+                                            cx.listener(
+                                                |this, _event: &open_gpui::MouseUpEvent, _window, _cx| {
+                                                    this.end_vol_drag();
+                                                },
+                                            ),
+                                        )
                                         .w(px(212.0))
                                         .h(px(20.0))
                                         .flex()
@@ -330,6 +359,30 @@ impl MainWindow {
                 cx.listener(
                     |this, event: &open_gpui::MouseDownEvent, _window, cx| {
                         this.on_progress_down(f32::from(event.position.x), cx);
+                    },
+                ),
+            )
+            // Mesmo motivo do `vol-slider`: o release sobre a barra não
+            // chega na raiz (occluded), então o fim do arrasto é tratado
+            // aqui — dentro e fora (`_out`) do slider.
+            .on_mouse_move(cx.listener(
+                |this, event: &open_gpui::MouseMoveEvent, _window, cx| {
+                    this.on_progress_move(f32::from(event.position.x), cx);
+                },
+            ))
+            .on_mouse_up(
+                MouseButton::Left,
+                cx.listener(
+                    |this, _event: &open_gpui::MouseUpEvent, _window, _cx| {
+                        this.end_progress_drag();
+                    },
+                ),
+            )
+            .on_mouse_up_out(
+                MouseButton::Left,
+                cx.listener(
+                    |this, _event: &open_gpui::MouseUpEvent, _window, _cx| {
+                        this.end_progress_drag();
                     },
                 ),
             )
