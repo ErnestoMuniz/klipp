@@ -48,6 +48,28 @@ pub struct OnlineSound {
     pub mp3: String,
 }
 
+/// Estado do atualizador interno (AppImage): checagem no GitHub na
+/// largada + botão na titlebar/sobre. O download roda em thread e o
+/// restart é executado na UI thread (ver `frontend::updater`).
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Default)]
+pub enum UpdateStatus {
+    /// Nunca checado neste processo.
+    #[default]
+    Idle,
+    /// Consultando `releases/latest`.
+    Checking,
+    /// Na última versão (ou checagem falhou silenciosa no auto-check).
+    UpToDate,
+    /// Release nova com asset `.AppImage` (mostra o botão na titlebar).
+    Available,
+    /// Baixando o `.AppImage` novo.
+    Downloading,
+    /// Trocando o arquivo e preparando o restart.
+    Applying,
+    /// Falha com mensagem em `update_error`.
+    Error,
+}
+
 /// Barras da forma de onda do player: envelope estático (pico 0–1 por
 /// trecho), calculado uma vez por play. Fixo para a trilha clicável
 /// de 640px caber exata (128 × 5px).
@@ -194,6 +216,23 @@ pub struct Shared {
     pub seek_request: Option<f32>,
     pub play_peaks: Vec<f32>,
     pub play_paused: bool,
+    /// Atualizador interno (ver `UpdateStatus`).
+    pub update_status: UpdateStatus,
+    /// Versão remota detectada ("0.4.0").
+    pub update_version: Option<String>,
+    /// URL direta do `.AppImage` novo (para baixar ao clicar).
+    pub update_asset_url: Option<String>,
+    /// Nome do asset (temporário do download).
+    pub update_asset_name: Option<String>,
+    /// Página da release (fallback fora do AppImage).
+    pub update_page_url: Option<String>,
+    /// Último erro de checagem/download (exibido no sobre).
+    pub update_error: Option<String>,
+    /// Progresso do download: (baixados, total?).
+    pub update_progress: Option<(u64, Option<u64>)>,
+    /// Caminho pronto para reiniciar: consumido no tick da UI thread,
+    /// que lança o processo novo e encerra este (restart atômico).
+    pub update_restart: Option<std::path::PathBuf>,
     pub version: u64,
 }
 
@@ -286,6 +325,14 @@ impl Shared {
             seek_request: None,
             play_peaks: vec![],
             play_paused: false,
+            update_status: UpdateStatus::Idle,
+            update_version: None,
+            update_asset_url: None,
+            update_asset_name: None,
+            update_page_url: None,
+            update_error: None,
+            update_progress: None,
+            update_restart: None,
             version: 1,
         }
     }

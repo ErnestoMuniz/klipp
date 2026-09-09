@@ -44,6 +44,9 @@ jobs:
       - name: Monta o AppImage
         run: ./packaging/appimage/build.sh
 
+      - name: Verifica update delta (AppImageUpdate/zsync)
+        run: ./packaging/appimage/check-update.sh packaging
+
       - name: Publica no Release
         uses: softprops/action-gh-release@v2
         with:

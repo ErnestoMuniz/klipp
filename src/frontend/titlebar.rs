@@ -1,15 +1,30 @@
-use open_gpui::{Context, FontWeight, IntoElement, MouseButton, Window, div, prelude::*, px};
+use open_gpui::{
+    Context, FontWeight, IntoElement, MouseButton, Window, div, prelude::*, px, rgb,
+};
 
 use super::icons::{icon, logo};
 use super::main_window::MainWindow;
 use super::theme;
+use crate::core::i18n::{t, t_fmt};
+use crate::core::state::UpdateStatus;
 
 /// Titlebar customizada (a janela é frameless — ver `main.rs`).
 /// Só as regiões livres arrastam (logo + espaçador central): os botões
 /// ficam fora de qualquer handler de drag, senão o compositor rouba o
 /// mouse no pressionar e o clique nunca completa.
-pub(crate) fn titlebar(window: &mut Window, cx: &mut Context<MainWindow>) -> impl IntoElement {
+pub(crate) fn titlebar(
+    this: &MainWindow,
+    window: &mut Window,
+    cx: &mut Context<MainWindow>,
+) -> impl IntoElement {
     let maximized = window.is_maximized();
+    // Pílula de update (só quando há algo acionável): disponível,
+    // baixando (com %) ou aplicando. Fora disso, some.
+    let (update_status, update_progress, update_lang) = {
+        let s = this.shared.lock().unwrap();
+        (s.update_status, s.update_progress, s.lang.clone())
+    };
+    let update_pill = update_pill_state(update_status, update_progress, &update_lang, cx);
     div()
         .flex()
         .items_center()
@@ -57,6 +72,7 @@ pub(crate) fn titlebar(window: &mut Window, cx: &mut Context<MainWindow>) -> imp
                 .flex()
                 .items_center()
                 .gap_1()
+                .child(update_pill)
                 .child(window_button("win-min", "lucide-minus", 14.0, false, cx))
                 .child(if maximized {
                     window_button("win-restore", "lucide-copy", 12.0, false, cx)
@@ -65,6 +81,59 @@ pub(crate) fn titlebar(window: &mut Window, cx: &mut Context<MainWindow>) -> imp
                 })
                 .child(window_button("win-close", "lucide-x", 14.0, true, cx)),
         )
+}
+
+/// Pílula de update na titlebar: só aparece quando há algo acionável
+/// (nova versão, download em curso ou aplicando). Retorna elemento vazio
+/// nos outros estados para não deslocar os botões da janela.
+fn update_pill_state(
+    status: UpdateStatus,
+    progress: Option<(u64, Option<u64>)>,
+    lang: &str,
+    cx: &mut Context<MainWindow>,
+) -> open_gpui::AnyElement {
+    use open_gpui::IntoElement as _;
+    let label = match status {        UpdateStatus::Available => t(lang, "update.update_now"),
+        UpdateStatus::Downloading => {
+            let pct = match progress {
+                Some((done, Some(total))) if total > 0 => {
+                    format!("{}%", done.saturating_mul(100) / total)
+                }
+                Some((done, _)) => format!("{} MB", done / 1_048_576),
+                None => "…".to_string(),
+            };
+            t_fmt(lang, "update.downloading", &[("pct", &pct)])
+        }
+        UpdateStatus::Applying => t(lang, "update.applying"),
+        _ => return div().into_any_element(),
+    };
+    let pill = div()
+        .id("titlebar-update")
+        .flex()
+        .items_center()
+        .gap_1()
+        .px_2()
+        .py_1()
+        .mr_1()
+        .bg(theme::accent())
+        .rounded(px(6.0))
+        .cursor_pointer()
+        .text_xs()
+        .font_weight(FontWeight::SEMIBOLD)
+        .text_color(rgb(0xf2f8ff))
+        .hover(|s| s.bg(theme::accent_hover()))
+        .child(icon("lucide-download", 13.0, rgb(0xf2f8ff)))
+        .child(label);
+    if status == UpdateStatus::Available {
+        pill.on_click(cx.listener(|this, _e, _w, cx| {
+            cx.stop_propagation();
+            super::updater::apply_update(&this.shared.clone());
+            cx.notify();
+        }))
+        .into_any_element()
+    } else {
+        pill.into_any_element()
+    }
 }
 
 fn window_button(

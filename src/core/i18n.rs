@@ -103,6 +103,15 @@ fn en(key: &str) -> &'static str {
         "about.platform" => "Platform",
         "about.tech" => "Built with",
         "about.github" => "View project on GitHub",
+        "update.check" => "Check for updates",
+        "update.checking" => "Checking…",
+        "update.up_to_date" => "You're up to date.",
+        "update.available" => "Version {version} available",
+        "update.update_now" => "Update now",
+        "update.downloading" => "Downloading {pct}…",
+        "update.applying" => "Applying update…",
+        "update.error" => "Update failed: {msg}",
+        "update.get" => "Get version {version}",
         "editor.title" => "Edit sound",
         "editor.name" => "Name",
         "editor.emoji" => "Emoji",
@@ -212,6 +221,15 @@ fn pt(key: &str) -> &'static str {
         "about.platform" => "Plataforma",
         "about.tech" => "Criado com",
         "about.github" => "Ver projeto no GitHub",
+        "update.check" => "Verificar atualizações",
+        "update.checking" => "Verificando…",
+        "update.up_to_date" => "Você está atualizado.",
+        "update.available" => "Versão {version} disponível",
+        "update.update_now" => "Atualizar agora",
+        "update.downloading" => "Baixando {pct}…",
+        "update.applying" => "Aplicando atualização…",
+        "update.error" => "Falha na atualização: {msg}",
+        "update.get" => "Baixar versão {version}",
         "editor.title" => "Editar áudio",
         "editor.name" => "Nome",
         "editor.emoji" => "Emoji",
@@ -283,6 +301,15 @@ mod tests {
             "browse.downloading",
             "player.ready",
             "player.idle",
+            "update.check",
+            "update.checking",
+            "update.up_to_date",
+            "update.available",
+            "update.update_now",
+            "update.downloading",
+            "update.applying",
+            "update.error",
+            "update.get",
         ] {
             assert_ne!(super::t("en", key), "", "falta em en: {key}");
             assert_ne!(super::t("pt-BR", key), "", "falta em pt-BR: {key}");
@@ -295,11 +322,20 @@ mod tests {
             "err.shortcut",
             "err.mic",
             "err.shortcut_gnome",
+            "update.error",
         ] {
             for lang in ["en", "pt-BR"] {
                 assert!(
                     super::t_fmt(lang, key, &[("msg", msg)]).contains(msg),
                     "{key} perdeu {{msg}} em {lang}"
+                );
+            }
+        }
+        for key in ["about.version", "update.available", "update.get"] {
+            for lang in ["en", "pt-BR"] {
+                assert!(
+                    super::t_fmt(lang, key, &[("version", msg)]).contains(msg),
+                    "{key} perdeu {{version}} em {lang}"
                 );
             }
         }

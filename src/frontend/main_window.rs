@@ -124,6 +124,8 @@ impl MainWindow {
         entity.spawn_background_tasks(cx);
         entity.spawn_poller(cx);
         entity.spawn_fs_watcher();
+        // Auto-check de update (uma vez por processo, silencioso).
+        super::updater::auto_check_updates(&entity.shared);
         entity
     }
 
@@ -437,6 +439,18 @@ impl MainWindow {
     }
 
     fn on_tick(&mut self, cx: &mut Context<Self>) {
+        // Restart pós-update (agendado pela thread de download): lança o
+        // processo novo e encerra este. Na UI thread, nunca na worker.
+        let restart = self.shared.lock().unwrap().update_restart.take();
+        if let Some(path) = restart {
+            if let Err(err) = super::updater::restart_into(path) {
+                let mut s = self.shared.lock().unwrap();
+                s.update_status = crate::core::state::UpdateStatus::Error;
+                s.update_error = Some(format!("{err:#}"));
+                s.bump();
+            }
+            return;
+        }
         // Monitores que aparecem depois da largada ganham overlay aqui.
         self.ensure_overlays(cx);
         // Âncora exata (thread) e hover: sincroniza as janelas de overlay.
@@ -1790,7 +1804,7 @@ impl Render for MainWindow {
                     this.import_dropped(paths.paths(), cx);
                 }),
             )
-            .child(titlebar(window, cx))
+            .child(titlebar(self, window, cx))
             .child(self.toolbar(
                 sounds.len(),
                 visible.len(),

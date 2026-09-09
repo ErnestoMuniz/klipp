@@ -112,6 +112,13 @@ fn main() {
     let settings = core::settings::load();
     let shared = Arc::new(Mutex::new(Shared::new(&settings)));
 
+    // Filho pós-update (ver `frontend::updater::restart_into`): o socket
+    // IPC do pai pode ainda existir — remove o arquivo antes do bind
+    // para não se enxergar como "segunda instância" e sair em seguida.
+    if std::env::var("KLIPP_UPDATED").is_ok() {
+        let _ = std::fs::remove_file(crate::backend::ipc::socket_path());
+        unsafe { std::env::remove_var("KLIPP_UPDATED") };
+    }
     // Instância única: segunda invocação entrega o comando (toggle/show)
     // e encerra — é assim que o atalho custom do DE alcança o processo.
     if matches!(

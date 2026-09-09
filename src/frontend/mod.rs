@@ -16,6 +16,7 @@ pub mod theme;
 pub mod titlebar;
 pub mod toolbar;
 pub mod ui;
+pub mod updater;
 
 pub use assets::AppAssets;
 pub use main_window::MainWindow;

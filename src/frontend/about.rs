@@ -10,6 +10,7 @@ use super::main_window::MainWindow;
 use super::theme;
 use super::ui::icon_action_btn;
 use crate::core::i18n::{t, t_fmt};
+use crate::core::state::UpdateStatus;
 
 const REPOSITORY_URL: &str = "https://github.com/ErnestoMuniz/klipp";
 
@@ -97,6 +98,7 @@ impl MainWindow {
                     .child(about_row(&t(&lang, "about.platform"), "Linux"))
                     .child(about_row(&t(&lang, "about.tech"), "Rust · GPUI")),
             )
+            .child(self.update_block(&lang, cx))
             .child(
                 div()
                     .id("about-github")
@@ -187,8 +189,140 @@ impl MainWindow {
             .into_any_element()
     }
 
-    pub(crate) fn open_about(&self, cx: &mut Context<Self>) {
+    /// Bloco de atualização no sobre: status + "verificar" + (se houver
+    /// release nova) botão de ação — atualiza e reinicia no AppImage,
+    /// abre a página da release fora dele (dev, tarball...).
+    fn update_block(&self, lang: &str, cx: &mut Context<Self>) -> impl IntoElement {
+        let (status, version, error, progress) = {
+            let s = self.shared.lock().unwrap();
+            (
+                s.update_status,
+                s.update_version.clone(),
+                s.update_error.clone(),
+                s.update_progress,
+            )
+        };
+        let is_appimage = crate::backend::updater::appimage_path().is_some();
+        let (status_text, status_color) = match status {
+            UpdateStatus::Idle => (String::new(), theme::muted()),
+            UpdateStatus::Checking => (t(lang, "update.checking"), theme::muted()),
+            UpdateStatus::UpToDate => (t(lang, "update.up_to_date"), theme::muted()),
+            UpdateStatus::Available => (
+                t_fmt(
+                    lang,
+                    "update.available",
+                    &[("version", version.as_deref().unwrap_or("?"))],
+                ),
+                theme::accent_hover(),
+            ),
+            UpdateStatus::Downloading => {
+                let pct = match progress {
+                    Some((done, Some(total))) if total > 0 => {
+                        format!("{}%", done.saturating_mul(100) / total)
+                    }
+                    Some((done, _)) => format!("{} MB", done / 1_048_576),
+                    None => "…".to_string(),
+                };
+                (
+                    t_fmt(lang, "update.downloading", &[("pct", &pct)]),
+                    theme::accent_hover(),
+                )
+            }
+            UpdateStatus::Applying => (t(lang, "update.applying"), theme::accent_hover()),
+            UpdateStatus::Error => (
+                t_fmt(
+                    lang,
+                    "update.error",
+                    &[("msg", error.as_deref().unwrap_or("?"))],
+                ),
+                theme::danger_hover(),
+            ),
+        };
+        let busy = matches!(
+            status,
+            UpdateStatus::Checking | UpdateStatus::Downloading | UpdateStatus::Applying
+        );
+        let mut block = div().w_full().flex().flex_col().gap_2().child(
+            div()
+                .w_full()
+                .flex()
+                .flex_row()
+                .items_center()
+                .justify_center()
+                .text_sm()
+                .text_color(status_color)
+                .child(status_text),
+        );
+        // Ação principal quando há release nova (antes do "verificar").
+        if status == UpdateStatus::Available
+            && let Some(ver) = version
         {
+            let label = if is_appimage {
+                t(lang, "update.update_now")
+            } else {
+                t_fmt(lang, "update.get", &[("version", &ver)])
+            };
+            block = block.child(
+                div()
+                    .id("about-update-apply")
+                    .on_click(cx.listener(|this, _e, _w, cx| {
+                        cx.stop_propagation();
+                        super::updater::apply_update(&this.shared.clone());
+                        cx.notify();
+                    }))
+                    .w_full()
+                    .flex()
+                    .flex_row()
+                    .items_center()
+                    .justify_center()
+                    .gap_2()
+                    .px_4()
+                    .py_2()
+                    .bg(theme::accent())
+                    .hover(|s| s.bg(theme::accent_hover()))
+                    .rounded(px(8.0))
+                    .cursor_pointer()
+                    .text_sm()
+                    .font_weight(FontWeight::SEMIBOLD)
+                    .text_color(open_gpui::rgb(0xf2f8ff))
+                    .child(icon("lucide-download", 16.0, open_gpui::rgb(0xf2f8ff)))
+                    .child(label),
+            );
+        }
+        block
+            .child(
+                div()
+                    .id("about-update-check")
+                    .on_click(cx.listener(move |this, _e, _w, cx| {
+                        cx.stop_propagation();
+                        if busy {
+                            return;
+                        }
+                        super::updater::check_updates(&this.shared.clone());
+                        cx.notify();
+                    }))
+                    .w_full()
+                    .flex()
+                    .flex_row()
+                    .items_center()
+                    .justify_center()
+                    .gap_2()
+                    .px_4()
+                    .py_2()
+                    .bg(theme::card())
+                    .border_1()
+                    .border_color(theme::border())
+                    .hover(|s| s.bg(theme::card_hover()))
+                    .rounded(px(8.0))
+                    .cursor_pointer()
+                    .text_sm()
+                    .font_weight(FontWeight::SEMIBOLD)
+                    .child(t(lang, "update.check")),
+            )
+            .into_any_element()
+    }
+
+    pub(crate) fn open_about(&self, cx: &mut Context<Self>) {        {
             let mut s = self.shared.lock().unwrap();
             s.about_open = true;
             s.about_closing = false;
