@@ -38,6 +38,11 @@
   </developer>
   <content_rating type="oars-1.1" />
   <releases>
+    <release version="0.5.0" date="2026-09-10">
+      <description>
+        <p>Suporte a Hyprland: atalho global nativo no config (segurar abre o seletor, soltar confirma, como no KDE) e cursor exato via IPC, sem extensão — mouse-coords 0.3.</p>
+      </description>
+    </release>
     <release version="0.4.0" date="2026-09-10">
       <description>
         <p>Mic virtual nativo sem pactl e correção do cleanup dos dispositivos virtuais ao sair.</p>
