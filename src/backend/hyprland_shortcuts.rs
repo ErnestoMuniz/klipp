@@ -267,22 +267,125 @@ fn hypr_key(name: &str) -> Option<String> {
     )
 }
 
-/// Linha de binding para o estilo dado.
-fn bind_line_for(style: Style, shortcut: &str) -> Option<String> {
+/// Nomes de keysym aceitos por `hl.is_key_down` para a tecla do atalho
+/// (formato normalizado do `hypr_key`). Devolve os dois casos quando diferem
+/// (sem/com Shift), o Lua testa os dois — cobre Shift e CapsLock.
+fn keysym_candidates(bind_key: &str) -> Vec<String> {
+    let upper = bind_key.to_ascii_uppercase();
+    if upper.chars().count() == 1 {
+        let c = upper.chars().next().unwrap();
+        if c.is_ascii_alphabetic() {
+            // XKB_KEY_a e XKB_KEY_A são keysyms distintos.
+            return vec![c.to_ascii_lowercase().to_string(), c.to_string()];
+        }
+        if c.is_ascii_digit() {
+            let shifted = match c {
+                '1' => "exclam",
+                '2' => "at",
+                '3' => "numbersign",
+                '4' => "dollar",
+                '5' => "percent",
+                '6' => "asciicircum",
+                '7' => "ampersand",
+                '8' => "asterisk",
+                '9' => "parenleft",
+                '0' => "parenright",
+                _ => unreachable!(),
+            };
+            return vec![c.to_string(), shifted.to_string()];
+        }
+    }
+    if let Some(n) = upper.strip_prefix('F').and_then(|n| n.parse::<u32>().ok()) {
+        if (1..=12).contains(&n) {
+            return vec![format!("F{n}")];
+        }
+    }
+    let pair = match upper.as_str() {
+        "SPACE" => ("space", "space"),
+        "ESC" | "ESCAPE" => ("Escape", "Escape"),
+        "TAB" => ("Tab", "ISO_Left_Tab"),
+        "BACKSPACE" => ("BackSpace", "BackSpace"),
+        "ENTER" | "RETURN" => ("Return", "Return"),
+        "INSERT" => ("Insert", "Insert"),
+        "DELETE" => ("Delete", "Delete"),
+        "HOME" => ("Home", "Home"),
+        "END" => ("End", "End"),
+        "PAGEUP" | "PAGE_UP" => ("Page_Up", "Page_Up"),
+        "PAGEDOWN" | "PAGE_DOWN" => ("Page_Down", "Page_Down"),
+        "UP" => ("Up", "Up"),
+        "DOWN" => ("Down", "Down"),
+        "LEFT" => ("Left", "Left"),
+        "RIGHT" => ("Right", "Right"),
+        "COMMA" => ("comma", "less"),
+        "PERIOD" => ("period", "greater"),
+        "SLASH" => ("slash", "question"),
+        "BACKSLASH" => ("backslash", "bar"),
+        "SEMICOLON" => ("semicolon", "colon"),
+        "APOSTROPHE" => ("apostrophe", "quotedbl"),
+        "BRACKETLEFT" => ("bracketleft", "braceleft"),
+        "BRACKETRIGHT" => ("bracketright", "braceright"),
+        "MINUS" => ("minus", "underscore"),
+        "EQUAL" => ("equal", "plus"),
+        "GRAVE" => ("grave", "asciitilde"),
+        _ => return Vec::new(),
+    };
+    vec![pair.0.to_string(), pair.1.to_string()]
+}
+
+/// Escapa uma string para virar literal Lua entre aspas duplas.
+fn lua_escape(s: &str) -> String {
+    s.replace('\\', "\\\\").replace('"', "\\\"").replace('\n', "\\n")
+}
+
+/// Bloco gerenciado. No Lua: o press abre o overlay e arma um timer que faz
+/// polling do release com `hl.is_key_down`, confirmando quando a tecla é
+/// solta. No parser legado: `bind` + `bindr` (melhor esforço).
+///
+/// O `bindr` do Hyprland não serve para atalho com modificadores: no release
+/// ele exige que o modmask atual bata com o do press, então soltar Alt/Shift
+/// antes da tecla principal perde o evento (ver `CKeybindManager`). O polling
+/// lê o estado físico da tecla e é imune à ordem dos modificadores.
+fn bind_block_for(style: Style, shortcut: &str) -> Option<String> {
+    let pressed = lua_escape(&crate::backend::custom_shortcut::pressed_command());
+    let released = lua_escape(&crate::backend::custom_shortcut::released_command());
     match style {
         Style::Lua => {
+            let key = hypr_key(split_spec(shortcut)?.1)?;
             let trigger = spec_to_hyprland(shortcut)?;
+            let candidates = keysym_candidates(&key);
+            let down = if candidates.is_empty() {
+                "true".to_string()
+            } else {
+                candidates
+                    .iter()
+                    .map(|k| format!("hl.is_key_down(\"{k}\")"))
+                    .collect::<Vec<_>>()
+                    .join(" or ")
+            };
             Some(format!(
-                "hl.bind(\"{trigger}\", hl.dsp.exec_cmd(\"{}\"), {{ description = \"{BIND_DESCRIPTION}\" }})",
-                crate::backend::custom_shortcut::toggle_command()
+                "local klipp_hold = nil\n\
+                 hl.bind(\"{trigger}\", function()\n\
+                 \u{20} hl.exec_cmd(\"{pressed}\")\n\
+                 \u{20} if klipp_hold then klipp_hold:set_enabled(false) end\n\
+                 \u{20} local t\n\
+                 \u{20} t = hl.timer(function()\n\
+                 \u{20}   if not ({down}) then\n\
+                 \u{20}     t:set_enabled(false)\n\
+                 \u{20}     if klipp_hold == t then klipp_hold = nil end\n\
+                 \u{20}     hl.exec_cmd(\"{released}\")\n\
+                 \u{20}   end\n\
+                 \u{20} end, {{ timeout = 50, type = \"repeat\" }})\n\
+                 \u{20} klipp_hold = t\n\
+                 end, {{ description = \"{BIND_DESCRIPTION}\" }})"
             ))
         }
         Style::Legacy => {
             let trigger = spec_to_legacy(shortcut)?;
+            let pressed = crate::backend::custom_shortcut::pressed_command();
+            let released = crate::backend::custom_shortcut::released_command();
             Some(format!(
-                "bind = {}, exec, {}",
-                trigger,
-                crate::backend::custom_shortcut::toggle_command()
+                "bind = {trigger}, exec, {pressed}\n\
+                 bindr = {trigger}, exec, {released}"
             ))
         }
     }
@@ -319,9 +422,9 @@ fn target_file() -> Option<(PathBuf, Style)> {
 fn install(shortcut: &str) -> anyhow::Result<bool> {
     let (path, style) = target_file()
         .ok_or_else(|| anyhow::anyhow!("config do Hyprland não encontrado"))?;
-    let line = bind_line_for(style, shortcut).ok_or_else(|| anyhow::anyhow!("invalid"))?;
+    let body = bind_block_for(style, shortcut).ok_or_else(|| anyhow::anyhow!("invalid"))?;
     let (begin, end) = markers(style);
-    let block = format!("{begin}\n{line}\n{end}");
+    let block = format!("{begin}\n{body}\n{end}");
     let content = std::fs::read_to_string(&path).unwrap_or_default();
     let updated = upsert_block(&content, &block, begin, end);
     if updated != content {
@@ -475,9 +578,9 @@ fn set_manual_error(shared: &Arc<std::sync::Mutex<Shared>>, shortcut: &str) {
     }
 }
 
-/// Linha sugerida (formato Lua) para a instrução manual e para logs.
+/// Bloco sugerido (formato Lua) para a instrução manual e para logs.
 pub fn bind_line(shortcut: &str) -> String {
-    bind_line_for(Style::Lua, shortcut).unwrap_or_else(|| shortcut.to_string())
+    bind_block_for(Style::Lua, shortcut).unwrap_or_else(|| shortcut.to_string())
 }
 
 fn set_shared(shared: &Arc<std::sync::Mutex<Shared>>, f: impl FnOnce(&mut Shared)) {
@@ -505,7 +608,7 @@ fn persist_shortcut(shared: &Arc<std::sync::Mutex<Shared>>) {
 
 #[cfg(test)]
 mod tests {
-    use super::{bind_to_spec, spec_to_hyprland, spec_to_legacy, upsert_block};
+    use super::{Style, bind_block_for, bind_to_spec, spec_to_hyprland, spec_to_legacy, upsert_block};
 
     #[test]
     fn spec_vira_trigger_do_hyprland() {
@@ -528,6 +631,39 @@ mod tests {
         assert_eq!(bind_to_spec(0, "F12").as_deref(), Some("F12"));
         assert!(bind_to_spec(0, "mouse:272").is_none());
         assert!(bind_to_spec(0, "code:10").is_none());
+    }
+
+    #[test]
+    fn bloco_lua_faz_polling_do_release() {
+        // Press abre; um timer lê o estado físico da tecla e confirma na
+        // soltura (o bindr do Hyprland perde o release se um modificador
+        // for solto antes da tecla principal).
+        let lua = bind_block_for(Style::Lua, "Alt+Shift+S").unwrap();
+        assert!(lua.contains("--overlay-pressed"), "{lua}");
+        assert!(lua.contains("--overlay-released"), "{lua}");
+        assert!(
+            lua.contains("hl.is_key_down(\"s\") or hl.is_key_down(\"S\")"),
+            "{lua}"
+        );
+        assert!(lua.contains("type = \"repeat\""), "{lua}");
+        assert!(!lua.contains("release = true"), "sem bindr: {lua}");
+
+        let conf = bind_block_for(Style::Legacy, "Alt+Shift+S").unwrap();
+        assert!(conf.starts_with("bind = ALT SHIFT, S, exec, "), "{conf}");
+        assert!(conf.contains("--overlay-pressed"));
+        assert!(conf.contains("\nbindr = ALT SHIFT, S, exec, "), "{conf}");
+        assert!(conf.contains("--overlay-released"));
+    }
+
+    #[test]
+    fn keysym_cobre_letras_digitos_e_nomes() {
+        use super::keysym_candidates;
+        assert_eq!(keysym_candidates("S"), vec!["s", "S"]);
+        assert_eq!(keysym_candidates("1"), vec!["1", "exclam"]);
+        assert_eq!(keysym_candidates("SPACE"), vec!["space", "space"]);
+        assert_eq!(keysym_candidates("PAGE_UP"), vec!["Page_Up", "Page_Up"]);
+        assert_eq!(keysym_candidates("comma"), vec!["comma", "less"]);
+        assert_eq!(keysym_candidates("F12"), vec!["F12"]);
     }
 
     #[test]

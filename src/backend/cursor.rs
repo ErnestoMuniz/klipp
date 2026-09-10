@@ -3,7 +3,7 @@ use std::process::Command;
 
 use crate::core::state::CursorExt;
 
-/// Cursor exato no GNOME Wayland (mouse-coords 0.2.0): status + instalação
+/// Cursor exato no GNOME Wayland (mouse-coords 0.3.0): status + instalação
 /// 1-clique da extensão companion.
 ///
 /// Sem a extensão o pie abre no centro e se corrige no primeiro movimento
@@ -11,6 +11,9 @@ use crate::core::state::CursorExt;
 /// (`org.mousecoords.Bridge` no ar), `get_position()` devolve o cursor
 /// real e o pie abre em cima dele. A Shell só carrega extensão nova no
 /// login: instalada-sem-login aparece como pendente, não como falha.
+///
+/// No KDE (KWin) e no Hyprland (socket IPC `cursorpos`) o mouse-coords
+/// resolve sozinho, sem extensão: nada a instalar nem a mostrar aqui.
 pub const EXT_UUID: &str = "mousecoords@mouse-coords.github.io";
 /// Bridges aceitas (a nossa ou a do wdotool, GNOME 45–48).
 const BRIDGES: &[&str] = &["org.mousecoords.Bridge", "org.wdotool.GnomeShellBridge"];
@@ -257,7 +260,7 @@ mod tests {
             matches!(status, CursorExt::Active | CursorExt::NeedsLogin),
             "instalada: ativa ou pendente de login, foi {status:?}"
         );
-        // Bridge no ar: o cursor real resolve (prova fim-a-fim do 0.2.0).
+        // Bridge no ar: o cursor real resolve (prova fim-a-fim do 0.3.0).
         if status == CursorExt::Active {
             let pos = mouse_coords::get_position().expect("bridge responde");
             assert!(

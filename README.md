@@ -23,7 +23,11 @@
   `klipp --toggle-overlay`); change it in Settings → Global shortcut.
   On Hyprland the compositor owns the key: the app writes a managed
   `hl.bind(...)` to your Hyprland config (e.g. `~/.config/hypr/bindings.lua`
-  on Omarchy) and runs `hyprctl reload` to apply it live.
+  on Omarchy) and runs `hyprctl reload` to apply it live. Holding opens the
+  picker and releasing confirms, like KDE. The release is watched with
+  `hl.timer`/`hl.is_key_down`, because the compositor's `bindr` drops it
+  when a modifier is let go first. The picker also opens exactly at the
+  cursor through the Hyprland IPC socket, no setup needed.
   On GNOME Wayland the picker opens exactly at the cursor with the
   companion extension (offered on first launch, then log out of your
   session and back in); without it, it opens centered and follows the

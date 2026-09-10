@@ -127,11 +127,12 @@ fn main() {
     ) {
         return;
     }
-    // Processo novo invocado direto com --toggle-overlay (ex. atalho sem
-    // instância rodando): sobe e já abre o seletor.
-    let boot_toggle = matches!(
+    // Processo novo invocado direto com --toggle-overlay/--overlay-pressed
+    // (ex. atalho sem instância rodando): sobe e já abre o seletor.
+    let boot_overlay = matches!(
         cli.command,
         Some(crate::backend::ipc::Command::ToggleOverlay)
+            | Some(crate::backend::ipc::Command::OverlayPressed)
     );
 
     let (shared2, engine2, graph2, assets2) =
@@ -146,7 +147,7 @@ fn main() {
             // no menu do tray). Ver `MainWindow::request_close`.
             cx.set_quit_mode(QuitMode::Explicit);
             open_main_window(cx, &shared2, &engine2, &graph2, &assets2);
-            if boot_toggle {
+            if boot_overlay {
                 crate::backend::overlay::open(&shared2);
             }
             // Consome os pedidos do tray icon na UI thread (~10Hz).

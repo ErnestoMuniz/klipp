@@ -11,6 +11,10 @@ use crate::core::state::Shared;
 pub enum Command {
     /// Abre o overlay (ou confirma a seleção, se já aberto).
     ToggleOverlay,
+    /// Abre o overlay (segurar o atalho; par de [`Command::OverlayReleased`]).
+    OverlayPressed,
+    /// Confirma a seleção (soltar o atalho).
+    OverlayReleased,
     /// Traz a janela principal ao frente.
     Show,
 }
@@ -32,6 +36,9 @@ pub const HELP: &str = "Klipp — desktop soundboard\n\
     Para atalho global, amarre esta flag num atalho custom do DE\n                         \
     (KDE: Settings → Shortcuts → Add New → Command/URL; GNOME: o app\n                         \
     registra sozinho em Settings → Keyboard → Custom Shortcuts).\n  \
+      --overlay-pressed  Abre o overlay; use com --overlay-released no\n                         \
+    atalho de soltar (Hyprland: bind + bindr com release).\n  \
+      --overlay-released Confirma a seleção do overlay (soltar o atalho).\n  \
       --show               Traz a janela principal ao frente.\n  \
       -h, --help           Mostra esta ajuda.\n  \
       -V, --version        Mostra a versão.\n\
@@ -50,6 +57,8 @@ pub fn parse_cli(args: impl IntoIterator<Item = String>) -> Cli {
     for arg in args {
         match arg.as_str() {
             "--toggle-overlay" => cli.command = Some(Command::ToggleOverlay),
+            "--overlay-pressed" => cli.command = Some(Command::OverlayPressed),
+            "--overlay-released" => cli.command = Some(Command::OverlayReleased),
             "--show" => cli.command = Some(Command::Show),
             "-h" | "--help" => cli.help = true,
             "-V" | "--version" => cli.version = true,
@@ -130,6 +139,8 @@ fn send_command(path: &std::path::Path, cmd: Command) -> std::io::Result<()> {
     stream.set_write_timeout(Some(Duration::from_secs(2)))?;
     let line = match cmd {
         Command::ToggleOverlay => "toggle-overlay\n",
+        Command::OverlayPressed => "overlay-pressed\n",
+        Command::OverlayReleased => "overlay-released\n",
         Command::Show => "show\n",
     };
     stream.write_all(line.as_bytes())?;
@@ -159,6 +170,19 @@ fn spawn_listener(listener: UnixListener, shared: Arc<Mutex<Shared>>) {
                     "toggle-overlay" => {
                         log::info!("ipc: toggle-overlay");
                         crate::backend::overlay::toggle(&shared);
+                    }
+                    "overlay-pressed" => {
+                        log::info!("ipc: overlay-pressed");
+                        crate::backend::overlay::open(&shared);
+                    }
+                    "overlay-released" => {
+                        log::info!("ipc: overlay-released");
+                        if let Ok(mut s) = shared.lock() {
+                            if s.overlay_active {
+                                s.confirm_request = true;
+                                s.bump();
+                            }
+                        }
                     }
                     "show" => {
                         log::info!("ipc: show");
@@ -196,6 +220,12 @@ mod tests {
 
         let cli = parse_cli(["--show".to_string()]);
         assert_eq!(cli.command, Some(Command::Show));
+
+        let cli = parse_cli(["--overlay-pressed".to_string()]);
+        assert_eq!(cli.command, Some(Command::OverlayPressed));
+
+        let cli = parse_cli(["--overlay-released".to_string()]);
+        assert_eq!(cli.command, Some(Command::OverlayReleased));
 
         let cli = parse_cli(["-h".to_string()]);
         assert!(cli.help);
@@ -241,5 +271,40 @@ mod tests {
         assert!(confirmed, "listener devia confirmar a seleção");
         let _ = std::fs::remove_file(&sock);
         unsafe { std::env::remove_var("KLIPP_IPC_SOCK") };
+    }
+
+    #[test]
+    fn listener_abre_no_press_e_confirma_no_release() {
+        // Caminho do push-to-talk do Hyprland: --overlay-pressed abre,
+        // --overlay-released confirma. Listener direto (sem env global,
+        // então roda em paralelo com os outros testes).
+        let sock = test_sock();
+        let _ = std::fs::remove_file(&sock);
+        let listener = UnixListener::bind(&sock).unwrap();
+        let shared = Arc::new(Mutex::new(Shared::new(&Settings::default())));
+        spawn_listener(listener, shared.clone());
+
+        send_command(&sock, Command::OverlayPressed).unwrap();
+        let mut opened = false;
+        for _ in 0..100 {
+            if shared.lock().unwrap().overlay_active {
+                opened = true;
+                break;
+            }
+            std::thread::sleep(Duration::from_millis(20));
+        }
+        assert!(opened, "pressed devia abrir o overlay");
+
+        send_command(&sock, Command::OverlayReleased).unwrap();
+        let mut confirmed = false;
+        for _ in 0..100 {
+            if shared.lock().unwrap().confirm_request {
+                confirmed = true;
+                break;
+            }
+            std::thread::sleep(Duration::from_millis(20));
+        }
+        assert!(confirmed, "released devia confirmar a seleção");
+        let _ = std::fs::remove_file(&sock);
     }
 }

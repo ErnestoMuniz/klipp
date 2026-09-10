@@ -119,4 +119,18 @@ mod tests {
             }
         }
     }
+
+    /// Ao vivo, no Hyprland: o mouse-coords 0.3.0 resolve o cursor pelo
+    /// socket IPC (`cursorpos`), sem extensão nem setup. Precisa de uma
+    /// sessão Hyprland: `cargo test hyprland_resolve -- --ignored --nocapture`.
+    #[test]
+    #[ignore]
+    fn hyprland_resolve_cursor_sem_extensao() {
+        assert!(
+            crate::backend::hyprland_shortcuts::is_hyprland(),
+            "precisa de uma sessão Hyprland"
+        );
+        let pos = mouse_coords::get_position().expect("socket IPC do Hyprland responde");
+        eprintln!("cursor no Hyprland: ({}, {})", pos.x, pos.y);
+    }
 }
