@@ -32,7 +32,8 @@
   into the library
 - **Edit sounds** — custom display name and emoji per clip
 - **Virtual microphone** — route clips (plus optional mic pass-through and
-  monitoring) through a virtual mic via `pactl`
+  monitoring) through a virtual mic (native PulseAudio/PipeWire API, no
+  `pactl` needed)
 - **Import your way** — file picker, drag-and-drop, or just drop files in
   the sounds folder (external changes are picked up live)
 - **Themes & languages** — dark/light/system theme, English and Português (BR)
@@ -46,8 +47,8 @@
   - Ubuntu/Debian: `sudo apt-get install pkg-config libpulse-dev libfontconfig-dev libxcb1-dev libxkbcommon-dev libxkbcommon-x11-dev libdbus-1-dev`
   - Without them the build fails in `freetype-sys` (`zlib.h: No such file`),
     `fontconfig-sys` (`fontconfig.pc not found`) or at link time (`-lxcb`, `-lxkbcommon`).
-- `pactl` compatible with PulseAudio or PipeWire-Pulse (only needed for the
-  virtual microphone; everything else works without it)
+- PulseAudio or PipeWire-Pulse running (for the virtual microphone;
+  everything else works without it)
 - An `xdg-desktop-portal` backend for the file picker
   (`scripts/dev-run.sh` fakes the portal app-id for dev)
 

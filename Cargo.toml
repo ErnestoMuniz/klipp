@@ -15,8 +15,9 @@ open-gpui-platform = { version = "0.2", features = ["wayland", "x11", "font-kit"
 ashpd = { version = "0.13", default-features = false, features = ["global_shortcuts", "async-io"] }
 zbus = { version = "5", default-features = false, features = ["async-io"] }
 symphonia = { version = "0.5", default-features = false, features = ["all"] }
-libpulse-simple-sys = "1.4"
-libpulse-sys = "1.4"
+libpulse-simple-sys = "1.22"
+libpulse-sys = "1.23"
+libpulse-binding = "2.30"
 # freetype do sistema no ubuntu-22.04 (CI) é velho demais para o
 # freetype-sys: compila o vendored (unifica feature no build todo).
 freetype-sys = { version = "0.23", features = ["bundled"] }

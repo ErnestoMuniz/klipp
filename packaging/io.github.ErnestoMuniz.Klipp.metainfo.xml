@@ -20,7 +20,7 @@
     <ul>
       <li>Sound library with search, favorites and per-clip emoji</li>
       <li>Quick overlay on a global shortcut (default Alt+Shift+S)</li>
-      <li>Virtual microphone routing via pactl (PipeWire/PulseAudio)</li>
+      <li>Virtual microphone routing (PipeWire/PulseAudio, no pactl needed)</li>
       <li>Browse and import sounds from myinstants.com</li>
     </ul>
   </description>
