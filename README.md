@@ -18,9 +18,12 @@
   volume slider with mute, elapsed/total clock
 - **Quick overlay** — floating pie picker on a global shortcut
   (default `Alt+Shift+S`); release to confirm, center button stops.
-  Outside a sandbox the app registers the shortcut itself (KDE via
-  KGlobalAccel, GNOME via a custom shortcut running
+  Outside a sandbox the app registers the shortcut itself on KDE
+  (KGlobalAccel) and GNOME (a custom shortcut running
   `klipp --toggle-overlay`); change it in Settings → Global shortcut.
+  On Hyprland the compositor owns the key: the app writes a managed
+  `hl.bind(...)` to your Hyprland config (e.g. `~/.config/hypr/bindings.lua`
+  on Omarchy) and runs `hyprctl reload` to apply it live.
   On GNOME Wayland the picker opens exactly at the cursor with the
   companion extension (offered on first launch, then log out of your
   session and back in); without it, it opens centered and follows the
@@ -58,8 +61,13 @@
 cargo run
 ```
 
-`scripts/dev-run.sh` wraps the binary with the portal app-id workaround
-needed for portal APIs without a sandbox. Tests:
+Outside KDE/GNOME the file picker goes through `xdg-desktop-portal`, which
+rejects callers without an app-id — so run the dev build with
+`scripts/dev-run.sh` instead of running the `cargo build` binary directly.
+The script fakes the portal app-id (host app-info hook), picks
+`target/debug/klipp` (or `target/release/klipp`; override with
+`KLIPP_BIN=...`) and restores the portal on exit. (On Hyprland the global
+shortcut is a compositor binding, not portal — see Features above.) Tests:
 
 ```sh
 cargo test

@@ -259,31 +259,8 @@ fn needs_modifier(gnome_key: &str) -> bool {
 
 /// Comando que o atalho custom executa. No AppImage prefere `$APPIMAGE`
 /// (o mount em /tmp muda a cada boot); no sandbox, `flatpak run`.
-pub fn toggle_command() -> String {
-    if ashpd::is_sandboxed() {
-        return "flatpak run io.github.ErnestoMuniz.Klipp --toggle-overlay".into();
-    }
-    if let Ok(appimage) = std::env::var("APPIMAGE") {
-        if !appimage.trim().is_empty() {
-            return format!("{} --toggle-overlay", quote_path(&appimage));
-        }
-    }
-    if let Ok(exe) = std::env::current_exe() {
-        let s = exe.to_string_lossy().into_owned();
-        if !s.is_empty() {
-            return format!("{} --toggle-overlay", quote_path(&s));
-        }
-    }
-    "klipp --toggle-overlay".into()
-}
-
-fn quote_path(p: &str) -> String {
-    if p.contains(' ') || p.contains('"') {
-        format!("\"{}\"", p.replace('"', "\\\""))
-    } else {
-        p.to_string()
-    }
-}
+/// Compartilhado com o caminho do Hyprland (`backend::hyprland_shortcuts`).
+pub use crate::backend::custom_shortcut::toggle_command;
 
 fn gsettings_get(schema_path: &str, key: &str) -> anyhow::Result<String> {
     let out = Command::new("gsettings")

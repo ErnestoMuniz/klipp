@@ -364,7 +364,9 @@ impl MainWindow {
         static TRAY_ONCE: std::sync::OnceLock<()> = std::sync::OnceLock::new();
         let shared_h = self.shared.clone();
         let native = crate::backend::native_shortcuts::using_native();
-        let gnome = !native && crate::backend::gnome_shortcuts::using_gnome();
+        let hyprland = !native && crate::backend::hyprland_shortcuts::using_hyprland();
+        let gnome =
+            !native && !hyprland && crate::backend::gnome_shortcuts::using_gnome();
         SHORTCUTS_ONCE.get_or_init(|| {
             if native {
                 let shared_n = shared_h.clone();
@@ -372,6 +374,18 @@ impl MainWindow {
                     .spawn(async move {
                         if let Err(err) = backend::native_shortcuts::run(shared_n).await {
                             log::warn!("atalho nativo indisponível: {err}");
+                        }
+                    })
+                    .detach();
+            } else if hyprland {
+                // Sem instalação em runtime: lê o binding que o usuário
+                // amarrou no config (ou deixa a instrução). Ver
+                // `backend::hyprland_shortcuts`.
+                let shared_y = shared_h.clone();
+                cx.background_executor()
+                    .spawn(async move {
+                        if let Err(err) = backend::hyprland_shortcuts::run(shared_y).await {
+                            log::warn!("atalho hyprland indisponível: {err}");
                         }
                     })
                     .detach();
@@ -1157,8 +1171,12 @@ impl MainWindow {
         if self.shared.lock().unwrap().shortcut_rebinding {
             return;
         }
+        // Hyprland também usa o gravador in-app: grava a tecla no bloco
+        // gerenciado do config do compositor (aplicar exige reiniciar a
+        // sessão). Ver `backend::hyprland_shortcuts`.
         if crate::backend::native_shortcuts::using_native()
             || crate::backend::gnome_shortcuts::using_gnome()
+            || crate::backend::hyprland_shortcuts::using_hyprland()
         {
             let mut s = self.shared.lock().unwrap();
             s.shortcut_rebinding = true;
@@ -1226,32 +1244,43 @@ impl MainWindow {
         cx.notify();
         window.blur();
         let shared = self.shared.clone();
-        // Mesma prioridade do spawn (nativo > gnome > portal).
-        let gnome = !crate::backend::native_shortcuts::using_native()
-            && crate::backend::gnome_shortcuts::using_gnome();
+        // Mesma prioridade do spawn (nativo > hyprland > gnome > portal).
+        let native = crate::backend::native_shortcuts::using_native();
+        let hyprland = !native && crate::backend::hyprland_shortcuts::using_hyprland();
+        let gnome = !native && !hyprland && crate::backend::gnome_shortcuts::using_gnome();
         cx.background_executor()
             .spawn(async move {
-                let result = if gnome {
+                let result = if hyprland {
+                    crate::backend::hyprland_shortcuts::set_shortcut(&shared, &spec).await
+                } else if gnome {
                     crate::backend::gnome_shortcuts::set_shortcut(&shared, &spec).await
                 } else {
                     crate::backend::native_shortcuts::set_shortcut(&shared, &spec).await
                 };
                 match result {
                     Ok(_) => {
-                        shared.lock().unwrap().shortcut_error = None;
+                        // Hyprland já deixou o aviso de "reinicie a sessão"
+                        // em `set_shortcut`; não limpar.
+                        if !hyprland {
+                            shared.lock().unwrap().shortcut_error = None;
+                        }
                     }
                     Err(err) => {
                         let mut s = shared.lock().unwrap();
                         let lang = s.lang.clone();
-                        s.shortcut_error = Some(if gnome {
-                            crate::backend::gnome_shortcuts::gnome_error(&lang, &err)
-                        } else {
-                            let kind = err.to_string();
-                            if kind.contains("taken") {
-                                t(&lang, "err.shortcut_taken")
-                            } else {
+                        let kind = err.to_string();
+                        s.shortcut_error = Some(if hyprland {
+                            if kind.contains("invalid") {
                                 t(&lang, "err.shortcut_invalid")
+                            } else {
+                                crate::backend::hyprland_shortcuts::manual_error(&lang, &spec)
                             }
+                        } else if gnome {
+                            crate::backend::gnome_shortcuts::gnome_error(&lang, &err)
+                        } else if kind.contains("taken") {
+                            t(&lang, "err.shortcut_taken")
+                        } else {
+                            t(&lang, "err.shortcut_invalid")
                         });
                     }
                 }

@@ -143,6 +143,12 @@ fn en(key: &str) -> &'static str {
         "err.shortcut_gnome" => {
             "GNOME shortcut: {msg} — add it manually in Settings → Keyboard → Custom Shortcuts with command {cmd}"
         }
+        "err.shortcut_hyprland" => {
+            "Hyprland sets the key in the compositor config. Add this line to your Hyprland config (e.g. ~/.config/hypr/bindings.lua on Omarchy) and restart the session: {line}"
+        }
+        "err.shortcut_hyprland_restart" => {
+            "Hyprland shortcut saved. Restart your session (log out and back in) to apply it."
+        }
         "err.import_none" => "No valid audio files to import",
         "err.mic" => "Microphone: {msg}",
         _ => "",
@@ -261,6 +267,12 @@ fn pt(key: &str) -> &'static str {
         "err.shortcut_gnome" => {
             "Atalho do GNOME: {msg} — adicione à mão em Configurações → Teclado → Atalhos personalizados com o comando {cmd}"
         }
+        "err.shortcut_hyprland" => {
+            "No Hyprland a tecla é definida no config do compositor. Adicione esta linha ao seu config (ex. ~/.config/hypr/bindings.lua no Omarchy) e reinicie a sessão: {line}"
+        }
+        "err.shortcut_hyprland_restart" => {
+            "Atalho do Hyprland salvo. Reinicie a sessão (sair e entrar de novo) para aplicar."
+        }
         "err.import_none" => "Nenhum arquivo de áudio válido para importar",
         "err.mic" => "Microfone: {msg}",
         _ => "",
@@ -286,6 +298,8 @@ mod tests {
             "err.shortcut_invalid",
             "err.shortcut_portal",
             "err.shortcut_gnome",
+            "err.shortcut_hyprland",
+            "err.shortcut_hyprland_restart",
             "cursor.title",
             "cursor.body",
             "cursor.install",
@@ -338,6 +352,12 @@ mod tests {
                     "{key} perdeu {{version}} em {lang}"
                 );
             }
+        }
+        for lang in ["en", "pt-BR"] {
+            assert!(
+                super::t_fmt(lang, "err.shortcut_hyprland", &[("line", msg)]).contains(msg),
+                "err.shortcut_hyprland perdeu {{line}} em {lang}"
+            );
         }
     }
 }

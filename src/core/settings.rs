@@ -86,10 +86,20 @@ pub fn settings_path() -> PathBuf {
 }
 
 pub fn load() -> Settings {
-    std::fs::read_to_string(settings_path())
+    let mut settings: Settings = std::fs::read_to_string(settings_path())
         .ok()
         .and_then(|raw| serde_json::from_str(&raw).ok())
-        .unwrap_or_default()
+        .unwrap_or_default();
+    // Atalho vazio é estado inválido (não há como o usuário desligar o
+    // atalho pela UI). Versões antigas do rebind do portal gravavam vazio
+    // quando o DE devolvia trigger vazio (ex. Hyprland), o que deixava o
+    // botão em branco para sempre; trata como "nunca configurado".
+    if settings.shortcut.trim().is_empty() {
+        settings.shortcut = Settings::default().shortcut;
+        // Conserta o arquivo uma vez, para não reler vazio a cada largada.
+        save(&settings);
+    }
+    settings
 }
 
 pub fn save(settings: &Settings) {

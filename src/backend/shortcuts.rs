@@ -54,6 +54,11 @@ fn spec_trigger(preferred: &str) -> String {
         }
     }
     if key.is_empty() {
+        // Spec vazio/ inválido não vira atalho de uma tecla só (sequestraria
+        // a digitação): cai no padrão.
+        if mods.is_empty() {
+            return "ALT+SHIFT+S".to_string();
+        }
         key = "S".to_string();
     }
     if mods.is_empty() {
@@ -170,6 +175,13 @@ pub async fn run(shared: Arc<std::sync::Mutex<Shared>>, preferred: String) -> an
                 let Some(event) = event else { break };
                 if let Some(shortcut) = event.shortcuts().first() {
                     let trigger = shortcut.trigger_description().to_string();
+                    // Trigger vazio (ex. Hyprland, que ignora o preferred
+                    // trigger) não é atalho: persistir vazio apagava o
+                    // vínculo do usuário e deixava o botão em branco.
+                    if trigger.trim().is_empty() {
+                        log::warn!("portal devolveu trigger vazio em ShortcutsChanged; mantendo '{}'", shared.lock().unwrap().shortcut);
+                        continue;
+                    }
                     set_shared(&shared, |s| {
                         s.shortcut = trigger.clone();
                         s.shortcut_error = None;
@@ -224,13 +236,16 @@ pub async fn rebind(shared: Arc<std::sync::Mutex<Shared>>) -> anyhow::Result<()>
     .await;
     let mut s = shared.lock().unwrap();
     match result {
-        Ok(Some(trigger)) => {
+        Ok(Some(trigger)) if !trigger.trim().is_empty() => {
             s.shortcut = trigger.clone();
             s.shortcut_error = None;
             let mut settings = crate::core::settings::load();
             settings.shortcut = trigger;
             crate::core::settings::save(&settings);
         }
+        // Trigger vazio = DE sem suporte a definir a tecla (ex. Hyprland):
+        // não sobrescreve o vínculo atual com vazio.
+        Ok(Some(_)) => {}
         // ConfigureShortcuts é fire-and-forget: o novo trigger chega via
         // sinal ShortcutsChanged (tratado em `run()`).
         Ok(None) => {}

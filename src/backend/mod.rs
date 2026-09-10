@@ -1,7 +1,9 @@
 pub mod audio_graph;
 pub mod cursor;
+pub mod custom_shortcut;
 pub mod decode;
 pub mod gnome_shortcuts;
+pub mod hyprland_shortcuts;
 pub mod ipc;
 pub mod native_shortcuts;
 pub mod online;
